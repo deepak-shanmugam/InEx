@@ -1,0 +1,24 @@
+#folders
+folder/
+text/
+test/
+
+# text files
+*.txt
+
+# object files
+*.o
+*.out
+
+# binary files
+*.bin
+*.inex
+
+# program
+program
+program.exe
+final
+final.exe
+
+# test files
+test*
