@@ -1,5 +1,5 @@
 /*
- * main.c
+ * inexData.c
  * 
  * Everything related to InEx data 
  * 

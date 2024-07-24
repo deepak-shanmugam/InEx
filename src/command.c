@@ -1,5 +1,5 @@
 /*
- * main.c
+ * command.c
  * 
  * Everything related to Commands and AppData (Excluding InEx Data)
  * 
@@ -95,6 +95,9 @@ static const CommandLookup cmd_lookup[] = {
 };
 
 
+/*
+ * Function to Create and initialize AppData
+ */
 AppDataPtr createAppData(void) 
 {
     AppDataPtr appData = calloc(1, sizeof(*appData));
@@ -124,6 +127,9 @@ AppDataPtr createAppData(void)
 }
 
 
+/*
+ * Function to perform the command which will be entered by the user
+ */
 int performGetCommand(AppDataPtr appData) 
 {
     int index;
@@ -151,11 +157,13 @@ int performGetCommand(AppDataPtr appData)
     index = 0;
     while (cmd_lookup[index].command != NULL) {
         if (strcmp(cmd_lookup[index].command, appData->token[0]) == 0) {
+            /* Minimum no of token for the command should be checked */
             if (returnCode < cmd_lookup[index].min_token) {
                 puts("\tMESSAGE: missing arguments!");
                 return index;
             }
 
+            /* execute the function corresponding to the command */
             if (cmd_lookup[index].cmdFunction(appData) < 0)
                 return -1;
 
@@ -171,6 +179,9 @@ int performGetCommand(AppDataPtr appData)
 }
 
 
+/*
+ * Function to Create and initialize AppData
+ */
 void destroyAppData(AppDataPtr appData) 
 {
     if (appData == NULL)
@@ -195,6 +206,9 @@ void destroyAppData(AppDataPtr appData)
 }
 
 
+/*
+ * Function to Create a backup for unsaved work due to error
+ */
 void createTemporaryBackup(AppDataPtr appData) 
 {
     if (appData == NULL) {
@@ -364,8 +378,11 @@ static int add_wrapper(AppDataPtr appData)
 
     if (temp_record.r_info >= 0) {
         returnCode = getRecord(&temp_record);
-        if (returnCode != 0)
+        if (returnCode != 0) {
+            if (returnCode > 0)
+                puts("\tMESSAGE: Enter valid values in Mandatory field!");
             return returnCode;
+        }
 
         //putRecord(&temp_record);
         puts("\tMESSAGE: <under development>!");

@@ -1,5 +1,5 @@
 /*
- * main.c
+ * customInput.c
  *
  *  Created on: 28-Jun-2024
  *      Author: deepaks

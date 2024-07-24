@@ -1,5 +1,5 @@
 /*
- * main.c
+ * appInfo.c
  *
  *  Created on: 1-Jul-2024
  *      Author: deepaks
