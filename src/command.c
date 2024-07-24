@@ -69,9 +69,9 @@ static int setToken(AppDataPtr appData);
 static int isSpace(char ch);
 static int printCommandPrompt(AppDataPtr appData);
 static int saveConfirmation(void);
-static int getRecord(struct record *rec);
+static int getRecord(struct record *rec, int mandatoryCheck);
 // static void showToken(AppDataPtr appData);
-// static void putRecord(struct record *rec);
+ static void putRecord(struct record *rec);
 
 
 /* Declaring static Lookup table */
@@ -91,7 +91,7 @@ static const CommandLookup cmd_lookup[] = {
     {"info"     , info_wrapper      , 1},
     {"save"     , save_wrapper      , 1},
     {"close"    , close_wrapper     , 1},
-    {NULL       , NULL}
+    {NULL       , NULL              , 0}
 };
 
 
@@ -180,7 +180,7 @@ int performGetCommand(AppDataPtr appData)
 
 
 /*
- * Function to Create and initialize AppData
+ * Function to destroy and free AppData
  */
 void destroyAppData(AppDataPtr appData) 
 {
@@ -377,15 +377,17 @@ static int add_wrapper(AppDataPtr appData)
         temp_record.r_info = 0;
 
     if (temp_record.r_info >= 0) {
-        returnCode = getRecord(&temp_record);
+        returnCode = getRecord(&temp_record, 1);    // 1 - include mandatoryCheck
         if (returnCode != 0) {
             if (returnCode > 0)
                 puts("\tMESSAGE: Enter valid values in Mandatory field!");
             return returnCode;
         }
 
-        //putRecord(&temp_record);
+        putRecord(&temp_record);    // debug
         puts("\tMESSAGE: <under development>!");
+    } else {
+        puts("\tMESSAGE: Income or Expense attrobute missing!");
     }
 
     return returnCode;
@@ -394,14 +396,36 @@ static int add_wrapper(AppDataPtr appData)
 
 static int edit_wrapper(AppDataPtr appData) 
 {
+    struct record temp_record = {0};
+    int returnCode;
+
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
+    if (appData->inex == NULL) {
+        puts("\tMESSAGE: No File opened!");
+        return 1;
+    }
+
+    returnCode  = 0;
+
+    if (appData->token[1] == NULL)
+        return 1;
+
+    /*
+     * pending: validate 'id' (token[1]) is numeric
+     */
+
+    returnCode = getRecord(&temp_record, 0);    // 0 - ignore mandatoryCheck
+    if (returnCode != 0) 
+        return returnCode;
+
+    putRecord(&temp_record);    //debug
     puts("\tMESSAGE: <under development>!");
 
-    return 0;
+    return returnCode;
 }
 
 
@@ -687,42 +711,50 @@ static int saveConfirmation(void)
 /*
  * Function to get record from the user
  */
-static int getRecord(struct record *rec) {
+static int getRecord(struct record *rec, int mandatoryCheck) {
+    char mandatoryIndicator = '\0';
     int returnCode;
 
     if (rec == NULL)
         return -2;
 
-    printf("\t*Amount: ");
-    if ((returnCode = getAmountFromConsole(&rec->r_amount)) <= 0) {
-        if (returnCode == 0) {
-            rec->r_amount = -1;
+    if (mandatoryCheck) 
+        mandatoryIndicator = '*';
+
+    printf("   %cAmount: ", mandatoryIndicator);
+    returnCode = getAmountFromConsole(&rec->r_amount);
+    if (returnCode < 0) {
+        logError(ERROR_INPUT);
+        return -1;
+    }
+    if (returnCode == 0) {
+        rec->r_amount = -1;     // indication to ignore during edit 
+        if (mandatoryCheck)
             return 1;
-        }
+    }
 
+    printf("   %cDate [yyyy-mm-dd]: ", mandatoryIndicator);
+    returnCode = getDateFromConsole(&rec->r_date);
+    if (returnCode < 0) {
         logError(ERROR_INPUT);
         return -1;
     }
-
-    printf("\t*Date [yyyy-mm-dd]: ");
-    if ((returnCode = getDateFromConsole(&rec->r_date)) <= 0) {
-        if (returnCode == 0) {
-            rec->r_date.day = 0;
+    if (returnCode == 0) {
+        rec->r_date.day = 0;    // indication to ignore during edit 
+        if (mandatoryCheck)
             return 1;
-        }
+    }
 
+    printf("   Entity: ");
+    returnCode = getStringFromConsole(rec->r_entity, ENTITY_LEN);
+    if (returnCode < 0) {
         logError(ERROR_INPUT);
         return -1;
     }
 
-    printf("\tEntity: ");
-    if ((returnCode = getStringFromConsole(rec->r_entity, ENTITY_LEN)) < 0) {
-        logError(ERROR_INPUT);
-        return -1;
-    }
-
-    printf("\tcomment: ");
-    if ((returnCode = getStringFromConsole(rec->r_comment, COMMENT_LEN)) < 0) {
+    printf("   comment: ");
+    returnCode = getStringFromConsole(rec->r_comment, COMMENT_LEN);
+    if (returnCode < 0) {
         logError(ERROR_INPUT);
         return -1;
     }
@@ -732,6 +764,7 @@ static int getRecord(struct record *rec) {
 
 
 /*
+// only for debugging
 static void showToken(AppDataPtr appData) 
 {
     int index = 0;
@@ -743,17 +776,15 @@ static void showToken(AppDataPtr appData)
 }
 */ 
 
-
-/*
+// only for debugging
 static void putRecord(struct record *rec) {
     if (rec == NULL)
         return;
 
-    printf("\n<data>\n");
-    printf("Amount: %ld.%02ld\n", (rec->r_amount / 100), (rec->r_amount % 100));
+    printf("\n<debug-data>\n");
+    printf("Amount: %ld\n", rec->r_amount);
     printf("Date: %d-%d-%d\n", rec->r_date.year, rec->r_date.month, rec->r_date.day);
     printf("Entity: %s\n", rec->r_entity);
     printf("Comment: %s\n", rec->r_comment);
     printf("info: %d\n", rec->r_info);
 } 
-*/ 
