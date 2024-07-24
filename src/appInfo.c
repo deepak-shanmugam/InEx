@@ -1,3 +1,10 @@
+/*
+ * main.c
+ *
+ *  Created on: 1-Jul-2024
+ *      Author: deepaks
+ */
+ 
 #include <stdio.h>
 
 #include "headers/appInfo.h"

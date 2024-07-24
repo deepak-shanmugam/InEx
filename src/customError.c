@@ -1,3 +1,10 @@
+/*
+ * main.c
+ *
+ *  Created on: 28-Jun-2024
+ *      Author: deepaks
+ */
+ 
 #include <stdio.h>
 
 #include "headers/customError.h"

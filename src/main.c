@@ -1,6 +1,13 @@
+/*
+ * main.c
+ *
+ *  Created on: 26-Jun-2024
+ *      Author: deepaks
+ */
+ 
 #include <stdio.h>
 
-#include "headers/appInterface.h"
+#include "headers/command.h"
 
 static void app_header();
 

@@ -1,5 +1,5 @@
-#ifndef APP_INTERFACE_H
-#define APP_INTERFACE_H
+#ifndef COMMAND_H
+#define COMMAND_H
 
 typedef struct appData* AppDataPtr;
 

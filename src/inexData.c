@@ -1,3 +1,12 @@
+/*
+ * main.c
+ * 
+ * Everything related to InEx data 
+ * 
+ *  Created on: 26-Jun-2024
+ *      Author: deepaks
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,7 +71,7 @@ InexDataPtr createInexData(const char *fileName)
         return NULL;
     }
 
-    inex = (InexDataPtr) calloc(1, sizeof(*inex));
+    inex = calloc(1, sizeof(*inex));
     if (inex == NULL) {
         logError(ERROR_MEMORY_ALLOC);
         return inex;
@@ -109,7 +118,7 @@ InexDataPtr openInexDataFromFile(const char *fileName)
         return NULL;
     }
 
-    inex = (InexDataPtr) calloc(1, sizeof(*inex));
+    inex = calloc(1, sizeof(*inex));
     if (inex == NULL) {
         logError(ERROR_MEMORY_ALLOC);
         goto end_open;

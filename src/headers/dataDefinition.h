@@ -8,12 +8,12 @@ typedef struct date {
     int day;
     int month;
     int year;
-} DATE;
+} Date;
 
 struct record {
     int         r_id;
     int         r_info;
-    DATE        r_date;
+    Date        r_date;
     long        r_amount;
     char        r_entity[ENTITY_LEN];
     char        r_comment[COMMENT_LEN];
