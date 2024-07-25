@@ -70,8 +70,9 @@ static int isSpace(char ch);
 static int printCommandPrompt(AppDataPtr appData);
 static int saveConfirmation(void);
 static int getRecord(struct record *rec, int mandatoryCheck);
+static int isNumeric(const char *str);
 // static void showToken(AppDataPtr appData);
- static void putRecord(struct record *rec);
+// static void putRecord(struct record *rec);
 
 
 /* Declaring static Lookup table */
@@ -222,6 +223,9 @@ void createTemporaryBackup(AppDataPtr appData)
 }
 
 
+/*
+ * A Generic warpper function to handle the invalid command operation 
+ */
 static int generic_wrapper(AppDataPtr appData) 
 {
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
@@ -343,7 +347,7 @@ static int list_wrapper(AppDataPtr appData)
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    listInexFile();
 
     return 0;
 }
@@ -380,12 +384,15 @@ static int add_wrapper(AppDataPtr appData)
         returnCode = getRecord(&temp_record, 1);    // 1 - include mandatoryCheck
         if (returnCode != 0) {
             if (returnCode > 0)
-                puts("\tMESSAGE: Enter valid values in Mandatory field!");
+                puts("\tMESSAGE: Enter valid values in Mandatory fields!");
             return returnCode;
         }
 
-        putRecord(&temp_record);    // debug
-        puts("\tMESSAGE: <under development>!");
+        // putRecord(&temp_record);    // debug
+
+        returnCode = addRecord(appData->inex, &temp_record);
+        if (returnCode != 0)
+            return 1;
     } else {
         puts("\tMESSAGE: Income or Expense attrobute missing!");
     }
@@ -414,16 +421,26 @@ static int edit_wrapper(AppDataPtr appData)
     if (appData->token[1] == NULL)
         return 1;
 
-    /*
-     * pending: validate 'id' (token[1]) is numeric
-     */
+    if (isNumeric(appData->token[1]) == 0) {
+        puts("\tMESSAGE: 'Id' argument should be numeric");
+        return 1;
+    }
+
+    returnCode = sscanf(appData->token[1],"%d",&temp_record.r_id);
+    if (returnCode <= 0) {
+        puts("\tMESSAGE: Conversion failed!");
+        return 1;
+    }
 
     returnCode = getRecord(&temp_record, 0);    // 0 - ignore mandatoryCheck
     if (returnCode != 0) 
         return returnCode;
 
-    putRecord(&temp_record);    //debug
-    puts("\tMESSAGE: <under development>!");
+    // putRecord(&temp_record);    //debug
+    
+    returnCode = editRecord(appData->inex, &temp_record);
+    if (returnCode != 0)
+        return 1;
 
     return returnCode;
 }
@@ -431,53 +448,103 @@ static int edit_wrapper(AppDataPtr appData)
 
 static int delete_wrapper(AppDataPtr appData) 
 {
+    int id, returnCode;
+
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    if (appData->inex == NULL) {
+        puts("\tMESSAGE: No File opened!");
+        return 1;
+    }
 
-    return 0;
+    if (appData->token[1] == NULL)
+        return 1;
+
+    if (isNumeric(appData->token[1]) == 0) {
+        puts("\tMESSAGE: 'Id' argument should be numeric");
+        return 1;
+    }
+
+    returnCode = sscanf(appData->token[1],"%d",&id);
+    if (returnCode <= 0) {
+        puts("\tMESSAGE: Conversion failed!");
+        return 1;
+    }
+
+    returnCode = deleteRecord(appData->inex, id);
+    if (returnCode != 0)
+        return 1;
+
+    return returnCode;
 }
 
 
 static int view_wrapper(AppDataPtr appData) 
 {
+    int returnCode;
+
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    if (appData->inex == NULL) {
+        puts("\tMESSAGE: No File opened!");
+        return 1;
+    }
 
-    return 0;
+    returnCode = viewRecord(appData->inex, appData->token[1]);
+    if (returnCode != 0)
+        return 1;
+
+    return returnCode;
 }
 
 
 static int filter_wrapper(AppDataPtr appData) 
 {
+    int returnCode;
+
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    if (appData->inex == NULL) {
+        puts("\tMESSAGE: No File opened!");
+        return 1;
+    }
 
-    return 0;
+    returnCode = filterRecord(appData->inex, appData->token);
+    if (returnCode != 0)
+        return 1;
+
+    return returnCode;
 }
 
 
 static int info_wrapper(AppDataPtr appData) 
 {
+    int returnCode;
+
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    if (appData->inex == NULL) {
+        puts("\tMESSAGE: No File opened!");
+        return 1;
+    }
 
-    return 0;
+    returnCode = infoInexData(appData->inex);
+    if (returnCode != 0)
+        return 1;
+
+    return returnCode;
 } 
 
 
@@ -711,17 +778,14 @@ static int saveConfirmation(void)
 /*
  * Function to get record from the user
  */
-static int getRecord(struct record *rec, int mandatoryCheck) {
-    char mandatoryIndicator = '\0';
+static int getRecord(struct record *rec, int mandatoryCheck) 
+{
     int returnCode;
 
     if (rec == NULL)
         return -2;
 
-    if (mandatoryCheck) 
-        mandatoryIndicator = '*';
-
-    printf("   %cAmount: ", mandatoryIndicator);
+    printf("   %cAmount            : ", (mandatoryCheck != 0) * 42);
     returnCode = getAmountFromConsole(&rec->r_amount);
     if (returnCode < 0) {
         logError(ERROR_INPUT);
@@ -733,7 +797,7 @@ static int getRecord(struct record *rec, int mandatoryCheck) {
             return 1;
     }
 
-    printf("   %cDate [yyyy-mm-dd]: ", mandatoryIndicator);
+    printf("   %cDate [yyyy-mm-dd] : ", (mandatoryCheck != 0) * 42);
     returnCode = getDateFromConsole(&rec->r_date);
     if (returnCode < 0) {
         logError(ERROR_INPUT);
@@ -745,14 +809,14 @@ static int getRecord(struct record *rec, int mandatoryCheck) {
             return 1;
     }
 
-    printf("   Entity: ");
+    printf("   %cEntity            : ", (mandatoryCheck != 0) * 32);
     returnCode = getStringFromConsole(rec->r_entity, ENTITY_LEN);
     if (returnCode < 0) {
         logError(ERROR_INPUT);
         return -1;
     }
 
-    printf("   comment: ");
+    printf("   %ccomment           : ", (mandatoryCheck != 0) * 32);
     returnCode = getStringFromConsole(rec->r_comment, COMMENT_LEN);
     if (returnCode < 0) {
         logError(ERROR_INPUT);
@@ -761,6 +825,22 @@ static int getRecord(struct record *rec, int mandatoryCheck) {
 
     return 0;
 } 
+
+
+static int isNumeric(const char *str) 
+{
+    int index;
+
+    if (str == NULL)
+        return 0;
+
+    for (index = 0; str[index] != '\0'; index++) {
+        if (str[index] < '0' || str[index] > '9')
+            return 0;
+    }
+
+    return 1;
+}
 
 
 /*
@@ -776,15 +856,20 @@ static void showToken(AppDataPtr appData)
 }
 */ 
 
+
+/*
 // only for debugging
-static void putRecord(struct record *rec) {
+static void putRecord(struct record *rec) 
+{
     if (rec == NULL)
         return;
 
     printf("\n<debug-data>\n");
+    printf("id: %d\n", rec->r_id);
+    printf("info: %d\n", rec->r_info);
     printf("Amount: %ld\n", rec->r_amount);
     printf("Date: %d-%d-%d\n", rec->r_date.year, rec->r_date.month, rec->r_date.day);
     printf("Entity: %s\n", rec->r_entity);
     printf("Comment: %s\n", rec->r_comment);
-    printf("info: %d\n", rec->r_info);
 } 
+*/ 

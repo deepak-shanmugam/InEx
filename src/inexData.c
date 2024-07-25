@@ -199,15 +199,6 @@ void destroyInexData(InexDataPtr inex)
 }
 
 
-void showFileName(InexDataPtr inex) 
-{
-    if (inex == NULL)
-        return;
-
-    printf("%s",inex->meta.md_file_name);
-}
-
-
 int removeInexFile(const char *fileName) 
 {
     char fileNameExtension[FILE_NAME_LEN];
@@ -240,6 +231,102 @@ int removeInexFile(const char *fileName)
     }
 
     return 0;
+}
+
+
+void listInexFile() 
+{
+    puts("\tMESSAGE: <under development>!");
+}
+
+
+int addRecord(InexDataPtr inex, struct record *rec) 
+{
+    if (inex == NULL || rec == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    puts("\tMESSAGE: <under development>!");
+
+    return 0;
+}
+
+
+int editRecord(InexDataPtr inex, struct record *rec) 
+{
+    if (inex == NULL || rec == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    puts("\tMESSAGE: <under development>!");
+
+    return 0;
+}
+
+
+int deleteRecord(InexDataPtr inex, int record_id)
+{
+    if (inex == NULL || record_id < 0) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    puts("\tMESSAGE: <under development>!");
+
+    return 0;
+}
+
+
+int viewRecord(InexDataPtr inex, const char *argument)
+{
+    if (inex == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    if (argument == NULL) {
+        puts("\tDebug: No argument specified!");
+    }
+
+    puts("\tMESSAGE: <under development>!");
+
+    return 0;
+}
+
+
+int filterRecord(InexDataPtr inex, char **token)
+{
+    if (inex == NULL || token == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    puts("\tMESSAGE: <under development>!");
+
+    return 0;
+}
+
+
+int infoInexData(InexDataPtr inex) {
+    if (inex == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    puts("\tMESSAGE: <under development>!");
+
+    return 0;
+}
+
+
+void showFileName(InexDataPtr inex) 
+{
+    if (inex == NULL)
+        return;
+
+    printf("%s",inex->meta.md_file_name);
 }
 
 

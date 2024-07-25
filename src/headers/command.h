@@ -1,6 +1,7 @@
 #ifndef COMMAND_H
 #define COMMAND_H
 
+/* Incomplete DataType */
 typedef struct appData* AppDataPtr;
 
 

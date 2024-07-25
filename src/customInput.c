@@ -128,7 +128,8 @@ int getAmountFromConsole(long *input)
 } 
 
 
-static int isValidDate(int day, int month, int year) {
+static int isValidDate(int day, int month, int year) 
+{
     static const int month_day[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
     int isLeap = 0;
 
@@ -153,7 +154,8 @@ static int isValidDate(int day, int month, int year) {
 } 
 
 
-static int isValidAmountFormat(char *str) {
+static int isValidAmountFormat(char *str) 
+{
     int i, point = 0, pos = 0;
 
     for (i = 0; str[i] != '\0'; i++) {
