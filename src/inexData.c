@@ -39,10 +39,15 @@ struct inexData {
 };
 
 
-static int fileNameValidity(const char *fileName);
-static int fileExist(const char *fileName);
 static int readInexDataFromFile(InexDataPtr inex, FILE *fp);
 static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp);
+static int fileNameValidity(const char *fileName);
+static int fileExist(const char *fileName);
+static int compareDate(Date d1, Date d2);
+static int copyRecord(struct record *dest, struct record *src);
+static int printRecord(struct record *rec);
+static void printRecordHeader();
+static void printRecordFooter();
 
 static const char *header_name = "inex-file-header";
 static const char *footer_name = "inex-file-footer";
@@ -240,14 +245,63 @@ void listInexFile()
 }
 
 
+/*
+ * Function to add record into into InEx Data
+ * record with latest date should be added on Top (head)
+ *
+ * It is caller functions responsibility to send valid records
+ */
 int addRecord(InexDataPtr inex, struct record *rec) 
 {
+    ListNodePtr node;
+    ListNodePtr current;
+
     if (inex == NULL || rec == NULL) {
         logError(ERROR_ARGUMENT);
+        return -2;
+    }
+
+    node = calloc(1, sizeof(*node));
+    if (node == NULL) {
+        logError(ERROR_MEMORY_ALLOC);
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    rec->r_id   = inex->meta.md_counter++;
+    node->next  = NULL;
+    copyRecord(&node->rec, rec);
+
+    current = inex->headNode;
+
+    /* if no exiting records */
+    if (inex->headNode == NULL) {
+        inex->headNode = node;
+        return 0;
+    }
+
+    /* if the new record needs to be in top */
+    if (compareDate(node->rec.r_date, current->rec.r_date) >= 0) {
+        node->next = inex->headNode;
+        inex->headNode = node;
+        return 0;
+    }
+
+    while(current != NULL) {
+        /* when tail is reached add the new record in the end */
+        if (current->next == NULL) {
+            current->next = node;
+            return 0;
+        }
+
+        /* if new record date is >= current->next record date */
+        if (compareDate(node->rec.r_date, current->next->rec.r_date) >= 0) {
+            node->next = current->next;
+            current->next = node;
+            return 0;
+        }
+
+        current = current->next;
+    }
 
     return 0;
 }
@@ -262,25 +316,60 @@ int editRecord(InexDataPtr inex, struct record *rec)
 
     puts("\tMESSAGE: <under development>!");
 
-    return 0;
+    return 1;
 }
 
 
+/*
+ * Funtion to delete the record based on the record id 
+ */
 int deleteRecord(InexDataPtr inex, int record_id)
 {
+    ListNodePtr current;
+    ListNodePtr temp;
+
     if (inex == NULL || record_id < 0) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    current = inex->headNode;
 
-    return 0;
+    /* if no existing records */
+    if (current == NULL)
+        return 1;
+
+    /* If matching record found in the start */
+    if (current->rec.r_id == record_id) {
+        inex->headNode = current->next;
+        free(current);
+        return 0;
+    }
+    
+    while (current != NULL) {
+        /* If no matching records found */
+        if (current->next == NULL)
+            return 1;
+
+        /* If matching record found in the middle or end */
+        if (current->next->rec.r_id == record_id) {
+            temp = current->next;
+            current->next = temp->next;
+            free(temp);
+            return 0;
+        }
+
+        current = current->next;
+    }
+
+    return 1;
 }
 
 
 int viewRecord(InexDataPtr inex, const char *argument)
 {
+    ListNodePtr current = inex->headNode;
+
     if (inex == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
@@ -289,6 +378,15 @@ int viewRecord(InexDataPtr inex, const char *argument)
     if (argument == NULL) {
         puts("\tDebug: No argument specified!");
     }
+
+    printRecordHeader();
+
+    while(current != NULL) {
+        printRecord(&current->rec);
+        current = current->next;
+    }
+
+    printRecordFooter();
 
     puts("\tMESSAGE: <under development>!");
 
@@ -315,7 +413,15 @@ int infoInexData(InexDataPtr inex) {
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    printf("\tFile name: %s.bin\n", inex->meta.md_file_name);
+    printf("\tcounter  : %d\n", inex->meta.md_counter);
+    /*
+     * Futurn Implementation:
+     *  1. Total no of records
+     *  2. No of Income and expense records
+     *  3. Total Income
+     *  4. Total Expense 
+     */
 
     return 0;
 }
@@ -395,6 +501,8 @@ static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp)
             logError(ERROR_FILE_WRITE);
             return -1;
         }
+
+        current_node = current_node->next;
     }
 
     return 0;
@@ -452,4 +560,119 @@ static int fileExist(const char *fileName)
     fclose(fp);
 
     return 1;
+} 
+
+
+static int compareDate(Date d1, Date d2) 
+{
+    if (d1.year > d2.year)
+        return 1;
+    if (d1.year < d2.year)
+        return -1;
+
+    if (d1.month > d2.month)
+        return 1;
+    if (d1.month < d2.month)
+        return -1;
+
+    if (d1.day > d2.day)
+        return 1;
+    if (d1.day < d2.day)
+        return -1;
+
+    return 0;
+} 
+
+
+static int copyRecord(struct record *dest, struct record *src) 
+{
+    if (dest == NULL || src == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    dest->r_id       = src->r_id;
+    dest->r_info     = src->r_info;
+    dest->r_amount   = src->r_amount;
+    dest->r_date     = src->r_date;
+    strncpy(dest->r_entity, src->r_entity, ENTITY_LEN);
+    strncpy(dest->r_comment, src->r_comment, COMMENT_LEN);
+
+    return 0;
+} 
+
+
+static int printRecord(struct record *rec) 
+{
+    static char type[4];
+    static const char *rec_footer = 
+        "\n|-----|"
+        "------------|"
+        "--------------------|"
+        "------------|"
+        "---------------------------------|";
+    static const char *rec_block = 
+        "\n|     | ";
+
+    if (rec == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    strcpy(type,"");
+
+    if (rec->r_info & 1)
+        strcpy(type,"+IN");
+
+    printf("| %3s | %10d   %15ld.%02ld   %04d-%02d-%02d   %31s  "
+        , type, rec->r_id, (rec->r_amount / 100), (rec->r_amount % 100)
+        , rec->r_date.year, rec->r_date.month, rec->r_date.day
+        , rec->r_entity);
+
+    if (strcmp(rec->r_comment,"") != 0) {
+        printf("%s",rec_block);
+        printf("%s",rec_block);
+        printf("Comment: %s", rec->r_comment);
+        printf("%s",rec_block);
+    }
+        
+    puts(rec_footer);
+
+    return 0;
+} 
+
+
+static void printRecordHeader() 
+{
+    static const char *record_header =
+        "\n\t<-----LIST OF RECORDS----->\n"
+
+        "\n|-----|"                              // 7
+        "------------|"                          // 13
+        "--------------------|"                  // 21
+        "------------|"                          // 13
+        "---------------------------------|"     // 34
+
+        "\n| ??? |"
+        "         ID |"
+        "             AMOUNT |"
+        "       DATE |"
+        "                          ENTITY |"
+
+        "\n|-----|"
+        "------------|"
+        "--------------------|"
+        "------------|"
+        "---------------------------------|";
+
+    puts(record_header);
+}
+
+
+static void printRecordFooter() 
+{
+    static const char *record_footer =
+        "\n\t<-------END OF LIST------->\n";
+        
+    puts(record_footer);
 } 

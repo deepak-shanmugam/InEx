@@ -153,7 +153,7 @@ int performGetCommand(AppDataPtr appData)
     if (returnCode == 0)    
         return 1;
 
-    // showToken(appData); 
+    // showToken(appData);  // debug
 
     index = 0;
     while (cmd_lookup[index].command != NULL) {
@@ -252,7 +252,7 @@ static int quit_wrapper(AppDataPtr appData)
     }
         
     if (appData->inex != NULL)
-        close_wrapper(appData);
+        return close_wrapper(appData);
 
     return 0;
 }
@@ -380,22 +380,26 @@ static int add_wrapper(AppDataPtr appData)
     if (strcmp(appData->token[1], "ex") == 0)
         temp_record.r_info = 0;
 
-    if (temp_record.r_info >= 0) {
-        returnCode = getRecord(&temp_record, 1);    // 1 - include mandatoryCheck
-        if (returnCode != 0) {
-            if (returnCode > 0)
-                puts("\tMESSAGE: Enter valid values in Mandatory fields!");
-            return returnCode;
-        }
-
-        // putRecord(&temp_record);    // debug
-
-        returnCode = addRecord(appData->inex, &temp_record);
-        if (returnCode != 0)
-            return 1;
-    } else {
+    if (temp_record.r_info < 0) {
         puts("\tMESSAGE: Income or Expense attrobute missing!");
+        return 1;
     }
+
+    /* get record from user, 1 (non-zero) indicates mandatory field check */
+    returnCode = getRecord(&temp_record, 1); 
+    if (returnCode != 0) {
+        if (returnCode > 0)
+            puts("\tMESSAGE: Enter valid values in Mandatory fields!");
+        return returnCode;
+    }
+
+    // putRecord(&temp_record);    // debug
+
+    returnCode = addRecord(appData->inex, &temp_record);
+    if (returnCode != 0)
+        return 1;
+
+    appData->saved = 0;
 
     return returnCode;
 }
@@ -432,7 +436,8 @@ static int edit_wrapper(AppDataPtr appData)
         return 1;
     }
 
-    returnCode = getRecord(&temp_record, 0);    // 0 - ignore mandatoryCheck
+    /* get record from user, 0 passed to ignore mandatory field check */
+    returnCode = getRecord(&temp_record, 0);   
     if (returnCode != 0) 
         return returnCode;
 
@@ -441,6 +446,8 @@ static int edit_wrapper(AppDataPtr appData)
     returnCode = editRecord(appData->inex, &temp_record);
     if (returnCode != 0)
         return 1;
+
+    appData->saved = 0;
 
     return returnCode;
 }
@@ -477,6 +484,8 @@ static int delete_wrapper(AppDataPtr appData)
     returnCode = deleteRecord(appData->inex, id);
     if (returnCode != 0)
         return 1;
+
+    appData->saved = 0;
 
     return returnCode;
 }
@@ -528,6 +537,11 @@ static int filter_wrapper(AppDataPtr appData)
 
 static int info_wrapper(AppDataPtr appData) 
 {
+    static const char *info_header =
+        "\n\t<-----Start of INFO----->\n";
+    static const char *info_footer =
+        "\n\t<------End of INFO------>\n";
+
     int returnCode;
 
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
@@ -540,7 +554,21 @@ static int info_wrapper(AppDataPtr appData)
         return 1;
     }
 
+    puts(info_header);
+
     returnCode = infoInexData(appData->inex);
+
+    printf("\tstatus   : ");
+    if (appData->saved) {
+        puts("saved");
+    } else {
+        puts("Not saved");
+    }
+
+    puts("\n\tMESSAGE: <under development>!");
+
+    puts(info_footer);
+
     if (returnCode != 0)
         return 1;
 
@@ -604,7 +632,7 @@ static int close_wrapper(AppDataPtr appData)
         appData->saved = 0;
     }
 
-    return 0;
+    return confirmation;
 } 
 
 
