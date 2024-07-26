@@ -70,7 +70,6 @@ static int isSpace(char ch);
 static int printCommandPrompt(AppDataPtr appData);
 static int saveConfirmation(void);
 static int getRecord(struct record *rec, int mandatoryCheck);
-static int isNumeric(const char *str);
 // static void showToken(AppDataPtr appData);
 // static void putRecord(struct record *rec);
 
@@ -425,14 +424,9 @@ static int edit_wrapper(AppDataPtr appData)
     if (appData->token[1] == NULL)
         return 1;
 
-    if (isNumeric(appData->token[1]) == 0) {
-        puts("\tMESSAGE: 'Id' argument should be numeric");
-        return 1;
-    }
-
     returnCode = sscanf(appData->token[1],"%d",&temp_record.r_id);
-    if (returnCode <= 0) {
-        puts("\tMESSAGE: Conversion failed!");
+    if (returnCode <= 0 || temp_record.r_id < 0) {
+        puts("\tMESSAGE: Invalid command argument!");
         return 1;
     }
 
@@ -470,20 +464,17 @@ static int delete_wrapper(AppDataPtr appData)
     if (appData->token[1] == NULL)
         return 1;
 
-    if (isNumeric(appData->token[1]) == 0) {
-        puts("\tMESSAGE: 'Id' argument should be numeric");
-        return 1;
-    }
-
     returnCode = sscanf(appData->token[1],"%d",&id);
-    if (returnCode <= 0) {
-        puts("\tMESSAGE: Conversion failed!");
+    if (returnCode <= 0 || id < 0) {
+        puts("\tMESSAGE: Invalid command argument!");
         return 1;
     }
 
     returnCode = deleteRecord(appData->inex, id);
-    if (returnCode != 0)
+    if (returnCode != 0) {
+        puts("\tMESSAGE: No records deleted!");
         return 1;
+    }
 
     appData->saved = 0;
 
@@ -558,14 +549,12 @@ static int info_wrapper(AppDataPtr appData)
 
     returnCode = infoInexData(appData->inex);
 
-    printf("\tstatus   : ");
+    printf("\tstatus        : ");
     if (appData->saved) {
         puts("saved");
     } else {
         puts("Not saved");
     }
-
-    puts("\n\tMESSAGE: <under development>!");
 
     puts(info_footer);
 
@@ -853,22 +842,6 @@ static int getRecord(struct record *rec, int mandatoryCheck)
 
     return 0;
 } 
-
-
-static int isNumeric(const char *str) 
-{
-    int index;
-
-    if (str == NULL)
-        return 0;
-
-    for (index = 0; str[index] != '\0'; index++) {
-        if (str[index] < '0' || str[index] > '9')
-            return 0;
-    }
-
-    return 1;
-}
 
 
 /*

@@ -25,6 +25,9 @@ struct metaData {
     char    md_header[HEADER_LEN];
     char    md_file_name[FILE_NAME_LEN];
     int     md_counter;
+    int     md_record_count;
+    long    md_total_income;
+    long    md_total_expense;
     char    md_footer[FOOTER_LEN];
 };
 
@@ -45,6 +48,7 @@ static int fileNameValidity(const char *fileName);
 static int fileExist(const char *fileName);
 static int compareDate(Date d1, Date d2);
 static int copyRecord(struct record *dest, struct record *src);
+static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec);
 static int printRecord(struct record *rec);
 static void printRecordHeader();
 static void printRecordFooter();
@@ -64,7 +68,7 @@ InexDataPtr createInexData(const char *fileName)
     }
         
     if (fileNameValidity(fileName) == 0) {
-        printf("\tMESSAGE: Invalid FileName!\n");
+        puts("\tMESSAGE: Invalid FileName!");
         return NULL;
     }
 
@@ -72,7 +76,7 @@ InexDataPtr createInexData(const char *fileName)
     strncat(fileNameExtension, ".bin", 5);
 
     if (fileExist(fileNameExtension)) {
-        printf("\tMESSAGE: File already exists!\n");
+        puts("\tMESSAGE: File already exists!");
         return NULL;
     }
 
@@ -85,7 +89,10 @@ InexDataPtr createInexData(const char *fileName)
     strncpy(inex->meta.md_header, header_name, HEADER_LEN);
     strncpy(inex->meta.md_footer, footer_name, FOOTER_LEN);
     strncpy(inex->meta.md_file_name, fileName, FILE_NAME_LEN);
-    inex->meta.md_counter = 1;
+    inex->meta.md_counter       = 1;
+    inex->meta.md_record_count  = 0;
+    inex->meta.md_total_income  = 0;
+    inex->meta.md_total_expense = 0;
     inex->headNode = NULL;
 
     return inex;
@@ -104,7 +111,7 @@ InexDataPtr openInexDataFromFile(const char *fileName)
     }
 
     if (fileNameValidity(fileName) == 0) {
-        printf("\tMESSAGE: Invalid FileName!\n");
+        puts("\tMESSAGE: Invalid FileName!");
         return NULL;
     }
 
@@ -112,7 +119,7 @@ InexDataPtr openInexDataFromFile(const char *fileName)
     strncat(fileNameExtension, ".bin", 5);
 
     if (fileExist(fileNameExtension) == 0) {
-        printf("\tMESSAGE: File doesn't exist!\n");
+        puts("\tMESSAGE: File doesn't exist!");
         return NULL;
     }
 
@@ -153,7 +160,7 @@ int saveInexData(InexDataPtr inex)
     }
 
     if (fileNameValidity(inex->meta.md_file_name) == 0) {
-        printf("\tMESSAGE: Invalid fileName!\n");
+        puts("\tMESSAGE: Invalid fileName!");
         return -1;
     }
 
@@ -214,7 +221,7 @@ int removeInexFile(const char *fileName)
     }
         
     if (fileNameValidity(fileName) == 0) {
-        printf("\tMESSAGE: Invalid FileName!\n");
+        puts("\tMESSAGE: Invalid FileName!");
         return -1;
     }
 
@@ -222,7 +229,7 @@ int removeInexFile(const char *fileName)
     strncat(fileNameExtension, ".bin", 5);
 
     if (fileExist(fileNameExtension) == 0) {
-        printf("\tMESSAGE: File doesn't exist!\n");
+        puts("\tMESSAGE: File doesn't exist!");
         return -1;
     }
 
@@ -267,9 +274,16 @@ int addRecord(InexDataPtr inex, struct record *rec)
         return -1;
     }
 
+    inex->meta.md_record_count++;
     rec->r_id   = inex->meta.md_counter++;
     node->next  = NULL;
     copyRecord(&node->rec, rec);
+
+    if (rec->r_info & 1) {
+        inex->meta.md_total_income += rec->r_amount;
+    } else {
+        inex->meta.md_total_expense += rec->r_amount;
+    } 
 
     current = inex->headNode;
 
@@ -341,6 +355,7 @@ int deleteRecord(InexDataPtr inex, int record_id)
 
     /* If matching record found in the start */
     if (current->rec.r_id == record_id) {
+        metaUpdate(inex, current, NULL);
         inex->headNode = current->next;
         free(current);
         return 0;
@@ -353,6 +368,7 @@ int deleteRecord(InexDataPtr inex, int record_id)
 
         /* If matching record found in the middle or end */
         if (current->next->rec.r_id == record_id) {
+            metaUpdate(inex, current->next, NULL);
             temp = current->next;
             current->next = temp->next;
             free(temp);
@@ -369,26 +385,38 @@ int deleteRecord(InexDataPtr inex, int record_id)
 int viewRecord(InexDataPtr inex, const char *argument)
 {
     ListNodePtr current = inex->headNode;
+    int count = 0;
 
     if (inex == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
+    /* if no argument, default to show 15 records */
     if (argument == NULL) {
         puts("\tDebug: No argument specified!");
+        count = 15;
+    } else {
+        if (strcmp(argument,"all") == 0) {
+            count = -1;
+        } else {
+            if (sscanf(argument,"%d",&count) <= 0 || count < 0) {
+                puts("\tMESSAGE: Invalid command arguments!");
+                return -1;
+            } 
+        }
     }
 
     printRecordHeader();
 
-    while(current != NULL) {
+    while(current != NULL && (count != 0)) {
         printRecord(&current->rec);
         current = current->next;
+        if (count > 0)
+            count--;
     }
 
     printRecordFooter();
-
-    puts("\tMESSAGE: <under development>!");
 
     return 0;
 }
@@ -407,21 +435,27 @@ int filterRecord(InexDataPtr inex, char **token)
 }
 
 
-int infoInexData(InexDataPtr inex) {
+int infoInexData(InexDataPtr inex) 
+{
+    long income, expense, balance_main, balance_deci;
+
     if (inex == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    printf("\tFile name: %s.bin\n", inex->meta.md_file_name);
-    printf("\tcounter  : %d\n", inex->meta.md_counter);
-    /*
-     * Futurn Implementation:
-     *  1. Total no of records
-     *  2. No of Income and expense records
-     *  3. Total Income
-     *  4. Total Expense 
-     */
+    income      = inex->meta.md_total_income;
+    expense     = inex->meta.md_total_expense;
+    balance_main = (income - expense) / 100;
+    balance_deci = (income - expense) % 100;
+    balance_deci = (balance_deci < 0) ? balance_deci * (-1) : balance_deci;
+
+    printf("\tFile name     : %s.bin\n"   , inex->meta.md_file_name);
+    printf("\tcounter       : %d\n"       , inex->meta.md_counter);
+    printf("\tTotal records : %d\n"       , inex->meta.md_record_count);
+    printf("\tTotal Income  : %ld.%02ld\n", income / 100, income % 100);
+    printf("\tTotal Expense : %ld.%02ld\n", expense / 100, expense % 100);
+    printf("\tBalance       : %ld.%02ld\n", balance_main, balance_deci);
 
     return 0;
 }
@@ -602,6 +636,38 @@ static int copyRecord(struct record *dest, struct record *src)
 } 
 
 
+/*
+ * Function to update the meta data of the inex data based on delete or edit
+ *
+ * In case of delete, only Node is present
+ * In case of edit, a Node (with existing data) and replacing record values
+ */
+static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec)
+{
+    if (inex == NULL || node == NULL) 
+        return -1;
+
+    if (node->rec.r_info & 1) {
+        inex->meta.md_total_income -= node->rec.r_amount;
+    } else {
+        inex->meta.md_total_expense -= node->rec.r_amount;
+    }
+
+    if (rec == NULL)
+        inex->meta.md_record_count--;
+
+    if (rec != NULL && rec->r_amount > 0) {
+        if (rec->r_info & 1) {
+            inex->meta.md_total_income += rec->r_amount;
+        } else {
+            inex->meta.md_total_expense += rec->r_amount;
+        }
+    }
+
+    return 0;
+}
+
+
 static int printRecord(struct record *rec) 
 {
     static char type[4];
@@ -611,7 +677,7 @@ static int printRecord(struct record *rec)
         "--------------------|"
         "------------|"
         "---------------------------------|";
-    static const char *rec_block = 
+    static const char *empty_block = 
         "\n|     | ";
 
     if (rec == NULL) {
@@ -629,12 +695,10 @@ static int printRecord(struct record *rec)
         , rec->r_date.year, rec->r_date.month, rec->r_date.day
         , rec->r_entity);
 
-    if (strcmp(rec->r_comment,"") != 0) {
-        printf("%s",rec_block);
-        printf("%s",rec_block);
-        printf("Comment: %s", rec->r_comment);
-        printf("%s",rec_block);
-    }
+    printf("%s",empty_block);
+    printf("%s",empty_block);
+    printf("COMMENT: %s", rec->r_comment);
+    printf("%s",empty_block);
         
     puts(rec_footer);
 
