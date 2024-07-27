@@ -182,8 +182,8 @@ int parseStringToAmount(const char *str, long *amount)
 
     if (isValidStringAmount(str) == 0)
         return 1;
-
-    if (sscanf(buffer,"%ld.%ld",&temp_main,&temp_deci) <= 0) 
+    
+    if (sscanf(str, "%ld.%ld", &temp_main, &temp_deci) <= 0) 
         return 2;
 
     if (temp_main < 0 || temp_main > 999999999999 ||

@@ -18,7 +18,7 @@ void about(void)
         "\n\tInEx - CLI based Income and Expense tracking application"
         "\n\tcopyright (c) 2024, Deepak Shanmugam"
         "\n\tLicense: GNU GENERAL PUBLIC LICENSE"
-        "\n\tversion: 0.0.1 (ALPHA)"
+        "\n\tversion: 0.9.1 (BETA)"
         "\n\tcontact: deepdeepdeepak@outlook.com";
 
     puts(about_text);
@@ -32,7 +32,7 @@ void help(char **token)
         return;
 
     static const char *help_text =
-        "\n<----START OF HELP MENU---->\n"
+        "\n\t<----START OF HELP MENU---->\n"
         "\nquit\n"
             "\t- to quit or exit the application\n"
             "\t- FORMAT: quit\n"
@@ -101,7 +101,7 @@ void help(char **token)
         "\nclose\n"
             "\t- to close the current inex file\n"
             "\t- FORMAT: close\n"
-        "\n<----END OF HELP MENU---->\n";
+        "\n\t<----END OF HELP MENU---->\n";
 
     puts(help_text);
 }
@@ -110,6 +110,7 @@ void help(char **token)
 static void show_license(void) 
 {
     static const char *license_text =
+        "\n\t<----LICENSE---->\n"
         "\n\tLICENSE: This program is free software: "
         "you can redistribute it and/or modify it "
         "under the terms of the GNU General Public License "
@@ -124,7 +125,8 @@ static void show_license(void)
 
         "\n\tYou should have received a copy of the "
         "GNU General Public License along with this program.  "
-        "If not, see <http://www.gnu.org/licenses/> for more info.\n";
+        "If not, see <http://www.gnu.org/licenses/> for more info.\n"
+        "\n\t<------END------>\n";
 
     puts(license_text);
 } 

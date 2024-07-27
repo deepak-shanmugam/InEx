@@ -87,7 +87,7 @@ static const CommandLookup cmd_lookup[] = {
     {"edit"     , edit_wrapper      , 2},
     {"delete"   , delete_wrapper    , 2},
     {"view"     , view_wrapper      , 1},
-    {"filter"   , filter_wrapper    , 4},
+    {"filter"   , filter_wrapper    , 2},
     {"info"     , info_wrapper      , 1},
     {"save"     , save_wrapper      , 1},
     {"close"    , close_wrapper     , 1},
@@ -426,7 +426,7 @@ static int edit_wrapper(AppDataPtr appData)
 
     returnCode = sscanf(appData->token[1],"%d",&temp_record.r_id);
     if (returnCode <= 0 || temp_record.r_id < 0) {
-        puts("\tMESSAGE: Invalid command argument!");
+        puts("\tMESSAGE: Enter valid argument!");
         return 1;
     }
 
@@ -438,8 +438,10 @@ static int edit_wrapper(AppDataPtr appData)
     // putRecord(&temp_record);    //debug
     
     returnCode = editRecord(appData->inex, &temp_record);
-    if (returnCode != 0)
+    if (returnCode != 0) {
+        puts("\tMESSAGE: No matching record found to edit!");
         return 1;
+    }
 
     appData->saved = 0;
 
@@ -519,8 +521,10 @@ static int filter_wrapper(AppDataPtr appData)
     }
 
     returnCode = filterRecord(appData->inex, appData->token);
-    if (returnCode != 0)
+    if (returnCode != 0) {
+        puts("\tMESSAGE: Please enter valid filter arguments!");
         return 1;
+    }
 
     return returnCode;
 }
@@ -855,7 +859,7 @@ static void showToken(AppDataPtr appData)
         index++;
     }
 }
-*/ 
+*/
 
 
 /*
@@ -873,4 +877,4 @@ static void putRecord(struct record *rec)
     printf("Entity: %s\n", rec->r_entity);
     printf("Comment: %s\n", rec->r_comment);
 } 
-*/ 
+*/

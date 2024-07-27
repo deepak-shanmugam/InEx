@@ -20,7 +20,11 @@
 #define FOOTER_LEN      32
 #define FILE_NAME_LEN   32
 
+/* Incomplete Datatype */
 typedef struct listNode* ListNodePtr;
+
+/* Function Pointer type definition for filter functions */
+typedef int (*FilterFunction)(InexDataPtr inex, char **token);
 
 struct metaData {
     char    md_header[HEADER_LEN];
@@ -42,6 +46,12 @@ struct inexData {
     ListNodePtr     headNode;
 };
 
+/* Lookup template for filter based on fieldName */
+typedef struct {
+    const char      *fieldName;
+    FilterFunction  filter;
+} FilterLookup;
+
 
 static int readInexDataFromFile(InexDataPtr inex, FILE *fp);
 static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp);
@@ -50,15 +60,27 @@ static int fileExist(const char *fileName);
 static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec);
 static void printCalculation(int no_of_rec, long income, long expense);
 
+/* filter related functions */
+static int filterByDate(InexDataPtr inex, char **token);
+static int filterByAmount(InexDataPtr inex, char **token);
+static int isRecordUnderDateRange(struct record *rec,Date *d1,Date *d2);
+static int isRecordUnderAmountRange(struct record *rec,long *a1, long *a2);
+
 /* temporary functions to print records in terminal */
 static int printRecord(struct record *rec);
 static void printRecordHeader();
 static void printRecordFooter();
 static void printComment(const char *comment);
 
-
 static const char *header_name = "inex-file-header";
 static const char *footer_name = "inex-file-footer";
+
+/* Declaring static Lookup table for filter */
+static const FilterLookup filter_lookup[] = {
+    {"date"     , filterByDate},
+    {"amount"   , filterByAmount},
+    {NULL, NULL}  
+};
 
 
 InexDataPtr createInexData(const char *fileName) 
@@ -76,6 +98,7 @@ InexDataPtr createInexData(const char *fileName)
         return NULL;
     }
 
+    /* add file extension (.bin) to check if file already exist */
     strncpy(fileNameExtension, fileName, FILE_NAME_LEN);
     strncat(fileNameExtension, ".bin", 5);
 
@@ -90,6 +113,7 @@ InexDataPtr createInexData(const char *fileName)
         return inex;
     }
 
+    /* Initialize necessary field values for newly created inex data */
     strncpy(inex->meta.md_header, header_name, HEADER_LEN);
     strncpy(inex->meta.md_footer, footer_name, FOOTER_LEN);
     strncpy(inex->meta.md_file_name, fileName, FILE_NAME_LEN);
@@ -119,6 +143,7 @@ InexDataPtr openInexDataFromFile(const char *fileName)
         return NULL;
     }
 
+    /* add file extension (.bin) to check if file already exist */
     strncpy(fileNameExtension, fileName, FILE_NAME_LEN);
     strncat(fileNameExtension, ".bin", 5);
 
@@ -152,6 +177,9 @@ end_open:
 }
 
 
+/*
+ * Function to show all the meta data of the InEx file
+ */
 int infoInexData(InexDataPtr inex) 
 {
     if (inex == NULL) {
@@ -269,6 +297,10 @@ int removeInexFile(const char *fileName)
 void listInexFile() 
 {
     puts("\tMESSAGE: <under development>!");
+    /*
+     * Future implementation:
+     *  To list all the InEx file present in Current Directory 
+     */
 }
 
 
@@ -289,6 +321,23 @@ int addRecord(InexDataPtr inex, struct record *rec)
         return -2;
     }
 
+    /*
+     * allow only 99,999 records (including deleted records)
+     * Future changes might be happen
+     *
+     * max_amount   : 999,999,999,999 
+     * max_amount_with_decimal_digit in storage:
+     *              : 99,999,999,999,999
+     * max_records  : 1,00,000 - 1 (99,999)
+     *
+     * max_amount (including decimal) x max_records
+     *              : 9,999,999,999,999,900,000
+     *
+     * max_long_value: (signed)
+     *              : 9,223,372,036,854,775,808 
+     *
+     * The above reason for restriction 
+     */
     if (inex->meta.md_counter > 99999) {
         puts("\tMESSAGE: Max record limit reached!");
         return 1;
@@ -349,12 +398,47 @@ int addRecord(InexDataPtr inex, struct record *rec)
 
 int editRecord(InexDataPtr inex, struct record *rec) 
 {
+    ListNodePtr current;
+    int year, month, day;
+
     if (inex == NULL || rec == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    /* Existing ID are always lesser than current counter */
+    if (rec->r_id >= inex->meta.md_counter) 
+        return 1;
+
+    current = inex->headNode;
+
+    while(current != NULL) {
+        if (current->rec.r_id == rec->r_id) {
+            year    = rec->r_date.year;
+            month   = rec->r_date.month;
+            day     = rec->r_date.day;
+
+            /* meta data updation */
+            metaUpdate(inex, current, rec);
+            
+            /* edit only eligible records */
+            if (rec->r_amount >= 0)
+                current->rec.r_amount = rec->r_amount;
+
+            if (isValidDate(year, month, day))
+                current->rec.r_date = rec->r_date;
+
+            if (strcmp(rec->r_entity, "") != 0)
+                strncpy(current->rec.r_entity, rec->r_entity, ENTITY_LEN);
+
+            if (strcmp(rec->r_comment, "") != 0)
+                strncpy(current->rec.r_comment, rec->r_comment, COMMENT_LEN);
+
+            return 0;
+        }
+
+        current = current->next;
+    }
 
     return 1;
 }
@@ -381,9 +465,13 @@ int deleteRecord(InexDataPtr inex, int record_id)
 
     /* If matching record found in the start */
     if (current->rec.r_id == record_id) {
+        /* update meta data */
         metaUpdate(inex, current, NULL);
+
+        /* delete */
         inex->headNode = current->next;
         free(current);
+
         return 0;
     }
     
@@ -394,10 +482,14 @@ int deleteRecord(InexDataPtr inex, int record_id)
 
         /* If matching record found in the middle or end */
         if (current->next->rec.r_id == record_id) {
+            /* update meta data */
             metaUpdate(inex, current->next, NULL);
+
+            /* delete */
             temp = current->next;
             current->next = temp->next;
             free(temp);
+
             return 0;
         }
 
@@ -421,8 +513,11 @@ int viewRecord(InexDataPtr inex, const char *argument)
         return -1;
     }
 
+    /*
+     * If no additional argument for 'view' command 
+     * show maximum of 15 records only 
+     */
     if (argument == NULL) {
-        /* if no argument, show only top 15 records */
         count = 15;
     } else {
         if (strcmp(argument,"all") == 0) {
@@ -437,6 +532,11 @@ int viewRecord(InexDataPtr inex, const char *argument)
 
     printRecordHeader();
 
+    /* 
+     * loop through all the records from the head 
+     * terminate based on the count value 
+     * if count value is -ve, show all 
+     */
     while(current != NULL && (count != 0)) {
         no_of_rec++;
         if (current->rec.r_info & 1) {
@@ -460,16 +560,42 @@ int viewRecord(InexDataPtr inex, const char *argument)
 }
 
 
+/*
+ * Generic Filter function to call the specific filter function 
+ * based on the fieldName mentioned by the user
+ */
 int filterRecord(InexDataPtr inex, char **token)
 {
+    int index = 0;
+
     if (inex == NULL || token == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    puts("\tMESSAGE: <under development>!");
+    /* if the first token itself is not 'filter', something is wrong */
+    if (token[0] == NULL || strcmp(token[0], "filter") != 0) {
+        logError(ERROR_SOMETHING);
+        return -1;
+    }
 
-    return 0;
+    /* loop through filter lookup */
+    while (filter_lookup[index].fieldName != NULL) {
+        if (token[1] == NULL) 
+            return 1;
+
+        /* 
+         * if the 2nd token matches with the filter lookup fieldName 
+         * call the corresponding filter function based on fiedlName
+         */
+        if (strcmp(filter_lookup[index].fieldName, token[1]) == 0) {
+            return filter_lookup[index].filter(inex, token);
+        }
+
+        index++;
+    }
+
+    return 1;
 }
 
 
@@ -482,6 +608,9 @@ void showFileName(InexDataPtr inex)
 }
 
 
+/*
+ * Function to read inex data from file 
+ */
 static int readInexDataFromFile(InexDataPtr inex, FILE *fp) 
 {
     struct record temp_record;
@@ -526,6 +655,9 @@ static int readInexDataFromFile(InexDataPtr inex, FILE *fp)
 }
 
 
+/*
+ * Function to write inex data into file 
+ */
 static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp) 
 {
     ListNodePtr current_node;
@@ -577,9 +709,16 @@ static int fileNameValidity(const char *fileName)
         if (ch == '\0')
             break;
 
+        /* only 25 characters are allowed */
         if (index >= (FILE_NAME_LEN - 7))
             return 0;
 
+        /*
+         * (0 - 9) is allowed
+         * (a - z) is allowed
+         * (A - Z) is allowed
+         * underscore (_) and hyphen (-) is allowed
+         */
         if ((ch >= '0' && ch <= '9') 
                 || (ch >= 'a' && ch <= 'z') 
                 || (ch >= 'A' && ch <= 'Z') 
@@ -631,20 +770,47 @@ static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec)
     if (inex == NULL || node == NULL) 
         return -1;
 
+    /* 
+     * Subtract the existing amount (for both delete and edit)
+     */
     if (node->rec.r_info & 1) {
         inex->meta.md_total_income -= node->rec.r_amount;
     } else {
         inex->meta.md_total_expense -= node->rec.r_amount;
     }
 
+    /* 
+     * if rec is NULL, then it means only delete. 
+     * so, decrease no of record count 
+     */
     if (rec == NULL)
         inex->meta.md_record_count--;
 
-    if (rec != NULL && rec->r_amount > 0) {
-        if (rec->r_info & 1) {
-            inex->meta.md_total_income += rec->r_amount;
+    /* 
+     * if rec is NOT NULL, then it means edit 
+     */
+    if (rec != NULL) {
+        if (rec->r_amount >= 0) {
+            /* 
+             * if Amount field going to be edited, 
+             * subtract existing value from income or expense (already did)
+             * add the new value into income or expense (below)
+             */
+            if (node->rec.r_info & 1) {
+                inex->meta.md_total_income += rec->r_amount;
+            } else {
+                inex->meta.md_total_expense += rec->r_amount;
+            }
         } else {
-            inex->meta.md_total_expense += rec->r_amount;
+            /* 
+             * if No changes in Amount field during edit, 
+             * restore the subtracted value in the first step (because no changes)
+             */
+            if (node->rec.r_info & 1) {
+                inex->meta.md_total_income += node->rec.r_amount;
+            } else {
+                inex->meta.md_total_expense += node->rec.r_amount;
+            }
         }
     }
 
@@ -652,6 +818,9 @@ static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec)
 }
 
 
+/*
+ * Function to print the metaData based on the function argument data 
+ */
 static void printCalculation(int no_of_rec, long income, long expense) 
 {
     long balance = income - expense;
@@ -662,6 +831,230 @@ static void printCalculation(int no_of_rec, long income, long expense)
     printf("\tBalance       : %ld.%02ld\n", balance / 100,
         (balance < 0) ? (balance % 100) * (-1) : (balance % 100));
 } 
+
+
+/*
+ * Function to filter records based on Date field
+ */
+static int filterByDate(InexDataPtr inex, char **token)
+{
+    ListNodePtr current;
+    Date upper_date, lower_date;
+    Date *upper, *lower;
+
+    /* for calculation based on the filtered output */
+    int no_of_rec   = 0;
+    long income     = 0;
+    long expense    = 0;
+
+    if (inex == NULL || token == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    if (token[2] == NULL || token[3] == NULL) 
+        return -1;
+    
+    /* 
+     * The upper limit should be a valid date or dot (.) 
+     * if valid date -> parse the value into date format, store address in upper
+     * else if dot (.) -> make upper as NULL
+     * otherwise return
+     */
+    if (parseStringToDate(token[2], &upper_date) != 0) {
+        if (strcmp(token[2],".") != 0)
+            return 1;
+        
+        upper = NULL;
+    } else {
+        upper = &upper_date;
+    }
+        
+    /* 
+     * The lower limit should be a valid date or dot (.) 
+     * if valid date -> parse the value into date format, store address in lower
+     * else if dot (.) -> make lower as NULL
+     * otherwise return
+     */
+    if (parseStringToDate(token[3], &lower_date) != 0) {
+        if (strcmp(token[3],".") != 0)
+            return 1;
+        
+        lower = NULL;
+    } else {
+        lower = &lower_date;
+    }
+
+    current = inex->headNode;
+    printRecordHeader();
+
+    /* loop through every records */
+    while (current != NULL) {
+        /* if the current record falls in filter range, proceed further */
+        if (isRecordUnderDateRange(&current->rec, upper, lower)) {
+            no_of_rec++;
+
+            if (current->rec.r_info & 1) {
+                income += current->rec.r_amount;
+            } else {
+                expense += current->rec.r_amount;
+            }
+
+            printRecord(&current->rec);
+        }
+
+        current = current->next;
+    }
+
+    puts("");
+    printCalculation(no_of_rec, income, expense);
+    printRecordFooter();
+
+    return 0;
+}
+
+
+/*
+ * Function to filter records based on Amount field
+ */
+static int filterByAmount(InexDataPtr inex, char **token)
+{
+    ListNodePtr current;
+    long upper_amount, lower_amount;
+    long *upper, *lower;
+
+    /* for calculation based on the filtered output */
+    int no_of_rec   = 0;
+    long income     = 0;
+    long expense    = 0;
+
+    if (inex == NULL || token == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    if (token[2] == NULL || token[3] == NULL)
+        return -1;
+
+    /* 
+     * The upper limit should be a valid amount or dot (.) 
+     * if valid amount -> parse the value as Amount format, store address in upper
+     * else if dot (.) -> make upper as NULL
+     * otherwise return
+     */
+    if (parseStringToAmount(token[2], &upper_amount) != 0) {
+        if (strcmp(token[2],".") != 0)
+            return 1;
+        
+        upper = NULL;
+    } else {
+        upper = &upper_amount;
+    }
+        
+    /* 
+     * The lower limit should be a valid amount or dot (.) 
+     * if valid amount -> parse the value as Amount format, store address in lower
+     * else if dot (.) -> make lower as NULL
+     * otherwise return
+     */
+    if (parseStringToAmount(token[3], &lower_amount) != 0) {
+        if (strcmp(token[3],".") != 0)
+            return 1;
+        
+        lower = NULL;
+    } else {
+        lower = &lower_amount;
+    }
+
+    current = inex->headNode;
+    printRecordHeader();
+
+    /* loop through every records */
+    while (current != NULL) {
+        /* if the current record falls in filter range, proceed further */
+        if (isRecordUnderAmountRange(&current->rec, upper, lower)) {
+            no_of_rec++;
+
+            if (current->rec.r_info & 1) {
+                income += current->rec.r_amount;
+            } else {
+                expense += current->rec.r_amount;
+            }
+
+            printRecord(&current->rec);
+        }
+
+        current = current->next;
+    }
+
+    puts("");
+    printCalculation(no_of_rec, income, expense);
+    printRecordFooter();
+
+    return 0;
+}
+
+
+/*
+ * Function to check if the Date of the record falls between the range
+ * Note: Either upper or lower range limit can be ignored
+ * 
+ * return 1 - indicates record falls under the range
+ */
+static int isRecordUnderDateRange(struct record *rec, Date *d1, Date *d2)
+{
+    if (rec == NULL)
+        return 0;
+
+    /* Both upper and lower limit cannot be ignored with dot(.) */
+    if (d1 == NULL && d2 == NULL)
+        return 0;
+
+    if (d1 != NULL) {
+        /* if record data is lower than the lower limit, fail */
+        if (compareDate(rec->r_date, *d1) < 0)
+            return 0;
+    }
+
+    if (d2 != NULL) {
+        /* if record data is upper than the upper limit, fail */
+        if (compareDate(rec->r_date, *d2) > 0)
+            return 0;
+    }
+
+    return 1;
+}
+
+
+/*
+ * Function to check if the Amount of the record falls between the range
+ * Note: Either upper or lower range limit can be ignored
+ * 
+ * return 1 - indicates record falls under the range
+ */
+static int isRecordUnderAmountRange(struct record *rec, long *a1, long *a2)
+{
+    if (rec == NULL)
+        return 0;
+
+    /* Both upper and lower limit cannot be ignored with dot (.) */
+    if (a1 == NULL && a2 == NULL)
+        return 0;
+
+    if (a1 != NULL) {
+        /* if record data is lower than the lower limit, fail */
+        if (rec->r_amount < *a1)
+            return 0;
+    }
+
+    if (a2 != NULL) {
+        /* if record data is upper than the upper limit, fail */
+        if (rec->r_amount > *a2)
+            return 0;
+    }
+
+    return 1;
+}
 
 
 /*

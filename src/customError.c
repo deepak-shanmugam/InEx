@@ -36,6 +36,9 @@ void logError(ErrorCode err)
         case ERROR_FILE_REMOVE:
             fprintf(stderr, "ERROR: Unable to remove file");
             break;
+        case ERROR_SOMETHING:
+            fprintf(stderr, "ERROR: Something went wrong");
+            break;
         default:
             fprintf(stderr, "ERROR: error not defined");
             break;
