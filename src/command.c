@@ -640,7 +640,7 @@ static int getCommand(AppDataPtr appData)
     if (printCommandPrompt(appData) != 0)
         return -1;
     
-    if (fgets(appData->cmd, CMD_LEN, stdin) == NULL) {
+    if (getStringFromConsole(appData->cmd, CMD_LEN) < 0) {
         logError(ERROR_INPUT);
         return -1;
     }
@@ -774,7 +774,7 @@ static int saveConfirmation(void)
 
     printf("%s", message);
     
-    if (fgets(buffer, SAVE_INPUT_LEN, stdin) == NULL)
+    if (getStringFromConsole(buffer, SAVE_INPUT_LEN) < 0)
         return -1;
 
     ch = buffer[0];
