@@ -12,11 +12,11 @@
 #include <string.h>
 
 #include "headers/command.h"
-#include "headers/appInfo.h"
 #include "headers/inexData.h"
+#include "headers/appInfo.h"
 #include "headers/customError.h"
-#include "headers/customInput.h"
 #include "headers/dataDefinition.h"
+#include "headers/dataFunction.h"
 
 #define CMD_LEN         512
 #define MAX_TOKEN       10 
@@ -553,7 +553,7 @@ static int info_wrapper(AppDataPtr appData)
     if (appData->saved) {
         puts("saved");
     } else {
-        puts("Not saved");
+        puts("*not saved");
     }
 
     puts(info_footer);

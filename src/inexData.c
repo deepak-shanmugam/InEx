@@ -1,7 +1,7 @@
 /*
  * inexData.c
  * 
- * Everything related to InEx data 
+ * Everything related to InEx data operations
  * 
  *  Created on: 26-Jun-2024
  *      Author: deepaks
@@ -12,8 +12,8 @@
 #include <string.h>
 
 #include "headers/inexData.h"
-#include "headers/dataDefinition.h"
 #include "headers/customError.h"
+#include "headers/dataDefinition.h"
 
 #define HEADER_LEN      32
 #define FOOTER_LEN      32
@@ -49,9 +49,14 @@ static int fileExist(const char *fileName);
 static int compareDate(Date d1, Date d2);
 static int copyRecord(struct record *dest, struct record *src);
 static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec);
+static void printCalculation(int no_of_rec, long income, long expense);
+
+/* temporary functions to print records in terminal */
 static int printRecord(struct record *rec);
 static void printRecordHeader();
 static void printRecordFooter();
+static void printComment(const char *comment);
+
 
 static const char *header_name = "inex-file-header";
 static const char *footer_name = "inex-file-footer";
@@ -93,7 +98,7 @@ InexDataPtr createInexData(const char *fileName)
     inex->meta.md_record_count  = 0;
     inex->meta.md_total_income  = 0;
     inex->meta.md_total_expense = 0;
-    inex->headNode = NULL;
+    inex->headNode              = NULL;
 
     return inex;
 }
@@ -123,7 +128,7 @@ InexDataPtr openInexDataFromFile(const char *fileName)
         return NULL;
     }
 
-    fp = fopen(fileNameExtension,"r");
+    fp = fopen(fileNameExtension,"rb");
 
     if (fp == NULL) {
         logError(ERROR_FILE_OPEN);
@@ -167,7 +172,7 @@ int saveInexData(InexDataPtr inex)
     strncpy(fileNameExtension, inex->meta.md_file_name, FILE_NAME_LEN);
     strncat(fileNameExtension, ".bin", 5);
 
-    fp = fopen(fileNameExtension, "w");
+    fp = fopen(fileNameExtension, "wb");
     if (fp == NULL) {
         logError(ERROR_FILE_OPEN);
         return -1;
@@ -257,6 +262,7 @@ void listInexFile()
  * record with latest date should be added on Top (head)
  *
  * It is caller functions responsibility to send valid records
+ * Note: Currently only allowing upto 99,999 records only
  */
 int addRecord(InexDataPtr inex, struct record *rec) 
 {
@@ -266,6 +272,11 @@ int addRecord(InexDataPtr inex, struct record *rec)
     if (inex == NULL || rec == NULL) {
         logError(ERROR_ARGUMENT);
         return -2;
+    }
+
+    if (inex->meta.md_counter > 99999) {
+        puts("\tMESSAGE: Max record limit reached!");
+        return 1;
     }
 
     node = calloc(1, sizeof(*node));
@@ -385,16 +396,18 @@ int deleteRecord(InexDataPtr inex, int record_id)
 int viewRecord(InexDataPtr inex, const char *argument)
 {
     ListNodePtr current = inex->headNode;
-    int count = 0;
+    int count       = 0;
+    int no_of_rec   = 0;
+    long income     = 0;
+    long expense    = 0;
 
     if (inex == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    /* if no argument, default to show 15 records */
     if (argument == NULL) {
-        puts("\tDebug: No argument specified!");
+        /* if no argument, show only top 15 records */
         count = 15;
     } else {
         if (strcmp(argument,"all") == 0) {
@@ -410,11 +423,21 @@ int viewRecord(InexDataPtr inex, const char *argument)
     printRecordHeader();
 
     while(current != NULL && (count != 0)) {
+        no_of_rec++;
+        if (current->rec.r_info & 1) {
+            income += current->rec.r_amount;
+        } else {
+            expense += current->rec.r_amount;
+        }
+
         printRecord(&current->rec);
         current = current->next;
         if (count > 0)
             count--;
     }
+
+    puts("");
+    printCalculation(no_of_rec, income, expense);
 
     printRecordFooter();
 
@@ -437,26 +460,16 @@ int filterRecord(InexDataPtr inex, char **token)
 
 int infoInexData(InexDataPtr inex) 
 {
-    long income, expense, balance_main, balance_deci;
-
     if (inex == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    income      = inex->meta.md_total_income;
-    expense     = inex->meta.md_total_expense;
-    balance_main = (income - expense) / 100;
-    balance_deci = (income - expense) % 100;
-    balance_deci = (balance_deci < 0) ? balance_deci * (-1) : balance_deci;
-
     printf("\tFile name     : %s.bin\n"   , inex->meta.md_file_name);
     printf("\tcounter       : %d\n"       , inex->meta.md_counter);
-    printf("\tTotal records : %d\n"       , inex->meta.md_record_count);
-    printf("\tTotal Income  : %ld.%02ld\n", income / 100, income % 100);
-    printf("\tTotal Expense : %ld.%02ld\n", expense / 100, expense % 100);
-    printf("\tBalance       : %ld.%02ld\n", balance_main, balance_deci);
-
+    printCalculation(inex->meta.md_record_count
+        , inex->meta.md_total_income, inex->meta.md_total_expense);
+    
     return 0;
 }
 
@@ -543,6 +556,12 @@ static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp)
 }
 
 
+/*
+ * Function to check if the given file name is valid or not
+ * Note: FileName should be without extention
+ *
+ * return 1 - valid fileName 
+ */
 static int fileNameValidity(const char *fileName) 
 {
     int index; 
@@ -577,6 +596,11 @@ static int fileNameValidity(const char *fileName)
 }
 
 
+/*
+ * To check if a file with given fileName exist or not
+ *
+ * return 1 - definitely exist (100%)
+ */
 static int fileExist(const char *fileName) 
 {
     FILE *fp;
@@ -586,7 +610,7 @@ static int fileExist(const char *fileName)
         return 0;
     }
 
-    fp = fopen(fileName, "r");
+    fp = fopen(fileName, "rb");
 
     if (fp == NULL)
         return 0;
@@ -597,6 +621,13 @@ static int fileExist(const char *fileName)
 } 
 
 
+/*
+ * Function to compare two dates
+ *
+ * if d1 > d2, return 1  (d1 is latest date)
+ * if d1 < d2, return -1 (d2 is latest date)
+ * if d1 = d2, return 0 
+ */
 static int compareDate(Date d1, Date d2) 
 {
     if (d1.year > d2.year)
@@ -618,6 +649,9 @@ static int compareDate(Date d1, Date d2)
 } 
 
 
+/*
+ * Function to copy values from source record to destination record
+ */
 static int copyRecord(struct record *dest, struct record *src) 
 {
     if (dest == NULL || src == NULL) {
@@ -668,20 +702,33 @@ static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec)
 }
 
 
+static void printCalculation(int no_of_rec, long income, long expense) 
+{
+    printf("\tNo of records : %d\n", no_of_rec);
+    printf("\tTotal Income  : %ld.%02ld\n", income / 100, income % 100);
+    printf("\tTotal Expense : %ld.%02ld\n", expense / 100, expense % 100);
+    printf("\tBalance       : %ld.%02ld\n", (income - expense) / 100,
+        ((income - expense) % 100) * ((-1) * ((income - expense) < 0)));
+} 
+
+
+/*
+ * Temporary way of printing records
+ */
 static int printRecord(struct record *rec) 
 {
     static char type[4];
     static const char *rec_footer = 
         "\n|-----|"
-        "------------|"
-        "--------------------|"
+        "-------|"
+        "-----------------|"
         "------------|"
         "---------------------------------|";
     static const char *empty_block = 
         "\n|     | ";
 
     if (rec == NULL) {
-        logError(ERROR_ARGUMENT);
+        //logError(ERROR_ARGUMENT);
         return -1;
     }
 
@@ -690,14 +737,15 @@ static int printRecord(struct record *rec)
     if (rec->r_info & 1)
         strcpy(type,"+IN");
 
-    printf("| %3s | %10d   %15ld.%02ld   %04d-%02d-%02d   %31s  "
+    printf("| %3s | %5d   %12ld.%02ld   %04d-%02d-%02d   %-31s  "
         , type, rec->r_id, (rec->r_amount / 100), (rec->r_amount % 100)
         , rec->r_date.year, rec->r_date.month, rec->r_date.day
         , rec->r_entity);
 
     printf("%s",empty_block);
     printf("%s",empty_block);
-    printf("COMMENT: %s", rec->r_comment);
+    printf("COMMENT : ");
+    printComment(rec->r_comment);
     printf("%s",empty_block);
         
     puts(rec_footer);
@@ -706,26 +754,29 @@ static int printRecord(struct record *rec)
 } 
 
 
+/*
+ * Temporary record header
+ */
 static void printRecordHeader() 
 {
     static const char *record_header =
         "\n\t<-----LIST OF RECORDS----->\n"
 
-        "\n|-----|"                              // 7
-        "------------|"                          // 13
-        "--------------------|"                  // 21
-        "------------|"                          // 13
-        "---------------------------------|"     // 34
+        "\n|-----|"                             // 7
+        "-------|"                              // 13 - 5 = 8
+        "-----------------|"                    // 21 - 3 = 18
+        "------------|"                         // 13
+        "---------------------------------|"    // 34
 
         "\n| ??? |"
-        "         ID |"
-        "             AMOUNT |"
+        "    ID |"
+        "          AMOUNT |"
         "       DATE |"
-        "                          ENTITY |"
+        " ENTITY                          |"
 
         "\n|-----|"
-        "------------|"
-        "--------------------|"
+        "-------|"
+        "-----------------|"
         "------------|"
         "---------------------------------|";
 
@@ -733,10 +784,37 @@ static void printRecordHeader()
 }
 
 
+/*
+ * Temporary record footer
+ */
 static void printRecordFooter() 
 {
     static const char *record_footer =
         "\n\t<-------END OF LIST------->\n";
         
     puts(record_footer);
+} 
+
+
+/*
+ * Temporary method to print comment section
+ */
+static void printComment(const char *comment)
+{
+    int index = 0;
+    static const char *initial_space =
+        "\n|     |           ";
+
+    if (comment == NULL)
+        return;
+
+    while (comment[index] != '\0') {
+        if (index % 60 == 0 && index != 0)
+            printf("%s", initial_space);
+
+        printf("%c", comment[index]);
+
+        index++;
+    }
+    
 } 

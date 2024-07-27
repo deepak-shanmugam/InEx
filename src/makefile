@@ -4,9 +4,9 @@ CFLAGS	= -Wall -g -pg
 
 all: program
 
-program: main.o command.o inexData.o customError.o appInfo.o customInput.o
+program: main.o command.o inexData.o customError.o appInfo.o dataFunction.o
 	@echo "\nLinking object files"
-	$(CC) $(CFLAGS) main.o command.o inexData.o customError.o appInfo.o customInput.o -o program
+	$(CC) $(CFLAGS) main.o command.o inexData.o customError.o appInfo.o dataFunction.o -o program
 
 main.o: main.c 
 	@echo "\nCompiling: main.c"
@@ -23,20 +23,20 @@ inexData.o: inexData.c
 	$(CC) $(CFLAGS) -c inexData.c
 #	$(CC) $(CFLAGS) $(INCLUDE) -c inexData.c
 
-customError.o: customError.c 
-	@echo "\nCompiling: customError.c"
-	$(CC) $(CFLAGS) -c customError.c
-#	$(CC) $(CFLAGS) $(INCLUDE) -c customError.c
-
 appInfo.o: appInfo.c 
 	@echo "\nCompiling: appInfo.c"
 	$(CC) $(CFLAGS) -c appInfo.c
 #	$(CC) $(CFLAGS) $(INCLUDE) -c appInfo.c
 
-customInput.o: customInput.c 
-	@echo "\nCompiling: customInput.c"
-	$(CC) $(CFLAGS) -c customInput.c
-#	$(CC) $(CFLAGS) $(INCLUDE) -c customInput.c
+dataFunction.o: dataFunction.c 
+	@echo "\nCompiling: dataFunction.c"
+	$(CC) $(CFLAGS) -c dataFunction.c
+#	$(CC) $(CFLAGS) $(INCLUDE) -c dataFunction.c
+
+customError.o: customError.c 
+	@echo "\nCompiling: customError.c"
+	$(CC) $(CFLAGS) -c customError.c
+#	$(CC) $(CFLAGS) $(INCLUDE) -c customError.c
 
 clean:
 	@echo "\nRemoving object and output files!"
