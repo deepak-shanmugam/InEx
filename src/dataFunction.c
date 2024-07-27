@@ -264,3 +264,50 @@ int isValidDate(int year, int month, int day)
 
     return 1;
 } 
+
+
+/*
+ * Function to compare two dates
+ *
+ * if d1 > d2, return 1  (d1 is latest date)
+ * if d1 < d2, return -1 (d2 is latest date)
+ * if d1 = d2, return 0 
+ */
+int compareDate(Date d1, Date d2) 
+{
+    if (d1.year > d2.year)
+        return 1;
+    if (d1.year < d2.year)
+        return -1;
+
+    if (d1.month > d2.month)
+        return 1;
+    if (d1.month < d2.month)
+        return -1;
+
+    if (d1.day > d2.day)
+        return 1;
+    if (d1.day < d2.day)
+        return -1;
+
+    return 0;
+} 
+
+
+/*
+ * Function to copy values from source record to destination record
+ */
+int copyRecord(struct record *dest, struct record *src) 
+{
+    if (dest == NULL || src == NULL) 
+        return -1;
+
+    dest->r_id       = src->r_id;
+    dest->r_info     = src->r_info;
+    dest->r_amount   = src->r_amount;
+    dest->r_date     = src->r_date;
+    strncpy(dest->r_entity, src->r_entity, ENTITY_LEN);
+    strncpy(dest->r_comment, src->r_comment, COMMENT_LEN);
+
+    return 0;
+} 

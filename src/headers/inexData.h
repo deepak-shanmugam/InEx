@@ -7,18 +7,25 @@
 typedef struct inexData* InexDataPtr;
 
 
+/* InEx Data operations */
 InexDataPtr createInexData(const char *fileName);
 
 InexDataPtr openInexDataFromFile(const char *fileName);
+
+int infoInexData(InexDataPtr inex);
 
 int saveInexData(InexDataPtr inex);
 
 void destroyInexData(InexDataPtr inex);
 
+
+/* InEx File operations */
 int removeInexFile(const char *fileName);
 
 void listInexFile();
 
+
+/* InEx Record operations */
 int addRecord(InexDataPtr inex, struct record *rec);
 
 int editRecord(InexDataPtr inex, struct record *rec);
@@ -29,8 +36,8 @@ int viewRecord(InexDataPtr inex, const char *argument);
 
 int filterRecord(InexDataPtr inex, char **token);
 
-int infoInexData(InexDataPtr inex);
 
+/* other InEx functions */
 void showFileName(InexDataPtr inex);
 
 #endif 

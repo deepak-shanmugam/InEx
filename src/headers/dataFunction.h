@@ -27,4 +27,10 @@ int isValidStringAmount(const char *str);
 
 int isValidDate(int year, int month, int day);
 
+
+/* other functions */
+int compareDate(Date d1, Date d2);
+
+int copyRecord(struct record *dest, struct record *src);
+
 #endif 

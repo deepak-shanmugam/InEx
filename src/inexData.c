@@ -14,6 +14,7 @@
 #include "headers/inexData.h"
 #include "headers/customError.h"
 #include "headers/dataDefinition.h"
+#include "headers/dataFunction.h"
 
 #define HEADER_LEN      32
 #define FOOTER_LEN      32
@@ -46,8 +47,6 @@ static int readInexDataFromFile(InexDataPtr inex, FILE *fp);
 static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp);
 static int fileNameValidity(const char *fileName);
 static int fileExist(const char *fileName);
-static int compareDate(Date d1, Date d2);
-static int copyRecord(struct record *dest, struct record *src);
 static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec);
 static void printCalculation(int no_of_rec, long income, long expense);
 
@@ -150,6 +149,22 @@ end_open:
     fclose(fp);
 
     return inex;
+}
+
+
+int infoInexData(InexDataPtr inex) 
+{
+    if (inex == NULL) {
+        logError(ERROR_ARGUMENT);
+        return -1;
+    }
+
+    printf("\tFile name     : %s.bin\n"   , inex->meta.md_file_name);
+    printf("\tcounter       : %d\n"       , inex->meta.md_counter);
+    printCalculation(inex->meta.md_record_count
+        , inex->meta.md_total_income, inex->meta.md_total_expense);
+    
+    return 0;
 }
 
 
@@ -458,22 +473,6 @@ int filterRecord(InexDataPtr inex, char **token)
 }
 
 
-int infoInexData(InexDataPtr inex) 
-{
-    if (inex == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
-    printf("\tFile name     : %s.bin\n"   , inex->meta.md_file_name);
-    printf("\tcounter       : %d\n"       , inex->meta.md_counter);
-    printCalculation(inex->meta.md_record_count
-        , inex->meta.md_total_income, inex->meta.md_total_expense);
-    
-    return 0;
-}
-
-
 void showFileName(InexDataPtr inex) 
 {
     if (inex == NULL)
@@ -622,55 +621,6 @@ static int fileExist(const char *fileName)
 
 
 /*
- * Function to compare two dates
- *
- * if d1 > d2, return 1  (d1 is latest date)
- * if d1 < d2, return -1 (d2 is latest date)
- * if d1 = d2, return 0 
- */
-static int compareDate(Date d1, Date d2) 
-{
-    if (d1.year > d2.year)
-        return 1;
-    if (d1.year < d2.year)
-        return -1;
-
-    if (d1.month > d2.month)
-        return 1;
-    if (d1.month < d2.month)
-        return -1;
-
-    if (d1.day > d2.day)
-        return 1;
-    if (d1.day < d2.day)
-        return -1;
-
-    return 0;
-} 
-
-
-/*
- * Function to copy values from source record to destination record
- */
-static int copyRecord(struct record *dest, struct record *src) 
-{
-    if (dest == NULL || src == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
-    dest->r_id       = src->r_id;
-    dest->r_info     = src->r_info;
-    dest->r_amount   = src->r_amount;
-    dest->r_date     = src->r_date;
-    strncpy(dest->r_entity, src->r_entity, ENTITY_LEN);
-    strncpy(dest->r_comment, src->r_comment, COMMENT_LEN);
-
-    return 0;
-} 
-
-
-/*
  * Function to update the meta data of the inex data based on delete or edit
  *
  * In case of delete, only Node is present
@@ -704,11 +654,13 @@ static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec)
 
 static void printCalculation(int no_of_rec, long income, long expense) 
 {
+    long balance = income - expense;
+
     printf("\tNo of records : %d\n", no_of_rec);
     printf("\tTotal Income  : %ld.%02ld\n", income / 100, income % 100);
     printf("\tTotal Expense : %ld.%02ld\n", expense / 100, expense % 100);
-    printf("\tBalance       : %ld.%02ld\n", (income - expense) / 100,
-        ((income - expense) % 100) * ((-1) * ((income - expense) < 0)));
+    printf("\tBalance       : %ld.%02ld\n", balance / 100,
+        (balance < 0) ? (balance % 100) * (-1) : (balance % 100));
 } 
 
 
