@@ -400,6 +400,7 @@ int editRecord(InexDataPtr inex, struct record *rec)
 {
     ListNodePtr current;
     int year, month, day;
+    int edited;
 
     if (inex == NULL || rec == NULL) {
         logError(ERROR_ARGUMENT);
@@ -411,6 +412,7 @@ int editRecord(InexDataPtr inex, struct record *rec)
         return 1;
 
     current = inex->headNode;
+    edited  = 0;
 
     while(current != NULL) {
         if (current->rec.r_id == rec->r_id) {
@@ -422,17 +424,33 @@ int editRecord(InexDataPtr inex, struct record *rec)
             metaUpdate(inex, current, rec);
             
             /* edit only eligible records */
-            if (rec->r_amount >= 0)
+            if (rec->r_amount >= 0) {
                 current->rec.r_amount = rec->r_amount;
+                edited++;
+            }
 
-            if (isValidDate(year, month, day))
+            if (isValidDate(year, month, day)) {
                 current->rec.r_date = rec->r_date;
+                edited++;
+                /*
+                 *  pending implementation:
+                 *  change the record position in list based on new date
+                 */
+            }
 
-            if (strcmp(rec->r_entity, "") != 0)
+            if (strcmp(rec->r_entity, "") != 0) {
                 strncpy(current->rec.r_entity, rec->r_entity, ENTITY_LEN);
+                edited++;
+            }                
 
-            if (strcmp(rec->r_comment, "") != 0)
+            if (strcmp(rec->r_comment, "") != 0) {
                 strncpy(current->rec.r_comment, rec->r_comment, COMMENT_LEN);
+                edited++;
+            }
+
+            /* to indicate if any field is actually got edited or not */
+            if (edited == 0)
+                return 1;
 
             return 0;
         }

@@ -1,5 +1,5 @@
 # InEx
-> Alpha Version:
+> BETA Version:
 
 BETA version of CLI based Income and Expense tracking application created using C language.
 

@@ -164,8 +164,12 @@ int performGetCommand(AppDataPtr appData)
             }
 
             /* execute the function corresponding to the command */
-            if (cmd_lookup[index].cmdFunction(appData) < 0)
+            if ((returnCode = cmd_lookup[index].cmdFunction(appData)) < 0)
                 return -1;
+            
+            /* do not quit, if 'cancel' is selected in save confirmation */
+            if (index == 0 && returnCode == 3)
+                return 1;
 
             return index;
         }
@@ -577,7 +581,7 @@ static int save_wrapper(AppDataPtr appData)
     }
 
     if (appData->inex == NULL) {
-        puts("\tMESSAGE: No file opened!");
+        puts("\tMESSAGE: No File opened!");
         return 0; 
     }
         
