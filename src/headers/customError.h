@@ -8,8 +8,7 @@ typedef enum {
     ERROR_FILE_OPEN,
     ERROR_FILE_READ,
     ERROR_FILE_WRITE,
-    ERROR_FILE_REMOVE,
-    ERROR_SOMETHING
+    ERROR_FILE_REMOVE
 } ErrorCode;
 
 void logError(ErrorCode err);

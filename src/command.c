@@ -87,7 +87,7 @@ static const CommandLookup cmd_lookup[] = {
     {"edit"     , edit_wrapper      , 2},
     {"delete"   , delete_wrapper    , 2},
     {"view"     , view_wrapper      , 1},
-    {"filter"   , filter_wrapper    , 2},
+    {"filter"   , filter_wrapper    , 4},
     {"info"     , info_wrapper      , 1},
     {"save"     , save_wrapper      , 1},
     {"close"    , close_wrapper     , 1},
@@ -327,7 +327,7 @@ static int open_wrapper(AppDataPtr appData)
 
 static int remove_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
+    if (appData == NULL || appData->token == NULL || appData->token[1] == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
@@ -384,7 +384,7 @@ static int add_wrapper(AppDataPtr appData)
         temp_record.r_info = 0;
 
     if (temp_record.r_info < 0) {
-        puts("\tMESSAGE: Income or Expense attrobute missing!");
+        puts("\tMESSAGE: Enter valid arguments!");
         return 1;
     }
 
@@ -392,15 +392,17 @@ static int add_wrapper(AppDataPtr appData)
     returnCode = getRecord(&temp_record, 1); 
     if (returnCode != 0) {
         if (returnCode > 0)
-            puts("\tMESSAGE: Enter valid values in Mandatory fields!");
+            puts("\tMESSAGE: Enter valid values in Mandatory field!");
         return returnCode;
     }
 
     // putRecord(&temp_record);    // debug
 
     returnCode = addRecord(appData->inex, &temp_record);
-    if (returnCode != 0)
+    if (returnCode != 0) {
+        puts("\tMESSAGE: No record is added!");
         return 1;
+    }
 
     appData->saved = 0;
 
@@ -430,7 +432,7 @@ static int edit_wrapper(AppDataPtr appData)
 
     returnCode = sscanf(appData->token[1],"%d",&temp_record.r_id);
     if (returnCode <= 0 || temp_record.r_id < 0) {
-        puts("\tMESSAGE: Enter valid argument!");
+        puts("\tMESSAGE: Enter valid arguments!");
         return 1;
     }
 
@@ -443,7 +445,7 @@ static int edit_wrapper(AppDataPtr appData)
     
     returnCode = editRecord(appData->inex, &temp_record);
     if (returnCode != 0) {
-        puts("\tMESSAGE: No matching record found to edit!");
+        puts("\tMESSAGE: No record is edited!");
         return 1;
     }
 
@@ -472,13 +474,13 @@ static int delete_wrapper(AppDataPtr appData)
 
     returnCode = sscanf(appData->token[1],"%d",&id);
     if (returnCode <= 0 || id < 0) {
-        puts("\tMESSAGE: Invalid command argument!");
+        puts("\tMESSAGE: Enter valid arguments!");
         return 1;
     }
 
     returnCode = deleteRecord(appData->inex, id);
     if (returnCode != 0) {
-        puts("\tMESSAGE: No records deleted!");
+        puts("\tMESSAGE: No record is deleted!");
         return 1;
     }
 
@@ -526,7 +528,7 @@ static int filter_wrapper(AppDataPtr appData)
 
     returnCode = filterRecord(appData->inex, appData->token);
     if (returnCode != 0) {
-        puts("\tMESSAGE: Please enter valid filter arguments!");
+        puts("\tMESSAGE: Enter valid arguments!");
         return 1;
     }
 
@@ -556,6 +558,8 @@ static int info_wrapper(AppDataPtr appData)
     puts(info_header);
 
     returnCode = infoInexData(appData->inex);
+    if (returnCode != 0) 
+        return 1;
 
     printf("\tstatus        : ");
     if (appData->saved) {
@@ -565,9 +569,6 @@ static int info_wrapper(AppDataPtr appData)
     }
 
     puts(info_footer);
-
-    if (returnCode != 0)
-        return 1;
 
     return returnCode;
 } 
@@ -662,21 +663,16 @@ static int getCommand(AppDataPtr appData)
  */
 static int setToken(AppDataPtr appData) 
 {
-    int cmd_index;
-    int tok_index;
-    int insideQuote;
-    int enable_token;
+    int cmd_index       = 0;
+    int tok_index       = 0;
+    int insideQuote     = 0;
+    int enable_token    = 1;
     char ch;
 
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
-
-    cmd_index       = 0;
-    tok_index       = 0;
-    insideQuote     = 0;
-    enable_token    = 1;
 
     memset(appData->token, 0, MAX_TOKEN * sizeof(*(appData->token)));
 
@@ -721,7 +717,7 @@ static int setToken(AppDataPtr appData)
     }
 
     if (insideQuote) {
-        puts("\tMESSAGE: missing close quote");
+        puts("\tMESSAGE: close quote missing!");
         return 0;
     }
 
@@ -881,4 +877,4 @@ static void putRecord(struct record *rec)
     printf("Entity: %s\n", rec->r_entity);
     printf("Comment: %s\n", rec->r_comment);
 } 
-*/
+*/ 

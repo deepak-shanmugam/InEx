@@ -55,7 +55,7 @@ typedef struct {
 
 static int readInexDataFromFile(InexDataPtr inex, FILE *fp);
 static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp);
-static int fileNameValidity(const char *fileName);
+static int isValidFileName(const char *fileName);
 static int fileExist(const char *fileName);
 static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec);
 static void printCalculation(int no_of_rec, long income, long expense);
@@ -93,7 +93,7 @@ InexDataPtr createInexData(const char *fileName)
         return NULL;
     }
         
-    if (fileNameValidity(fileName) == 0) {
+    if (isValidFileName(fileName) == 0) {
         puts("\tMESSAGE: Invalid FileName!");
         return NULL;
     }
@@ -131,28 +131,28 @@ InexDataPtr openInexDataFromFile(const char *fileName)
 {
     FILE *fp;
     InexDataPtr inex;
-    char fileNameExtension[FILE_NAME_LEN];
+    char completeFileName[FILE_NAME_LEN];
 
     if (fileName == NULL) {
         logError(ERROR_ARGUMENT);
         return NULL;
     }
 
-    if (fileNameValidity(fileName) == 0) {
+    if (isValidFileName(fileName) == 0) {
         puts("\tMESSAGE: Invalid FileName!");
         return NULL;
     }
 
-    /* add file extension (.bin) to check if file already exist */
-    strncpy(fileNameExtension, fileName, FILE_NAME_LEN);
-    strncat(fileNameExtension, ".bin", 5);
+    /* add file extension (.bin) to use in file operation functions */
+    strncpy(completeFileName, fileName, FILE_NAME_LEN);
+    strncat(completeFileName, ".bin", 5);
 
-    if (fileExist(fileNameExtension) == 0) {
+    if (fileExist(completeFileName) == 0) {
         puts("\tMESSAGE: File doesn't exist!");
         return NULL;
     }
 
-    fp = fopen(fileNameExtension,"rb");
+    fp = fopen(completeFileName,"rb");
 
     if (fp == NULL) {
         logError(ERROR_FILE_OPEN);
@@ -199,33 +199,33 @@ int infoInexData(InexDataPtr inex)
 int saveInexData(InexDataPtr inex) 
 {
     FILE *fp;
-    char fileNameExtension[FILE_NAME_LEN];
+    char completeFileName[FILE_NAME_LEN];
     int returnCode;
 
     if (inex == NULL) {
         logError(ERROR_ARGUMENT);
-        return -1;
+        return -2;
     }
 
-    if (fileNameValidity(inex->meta.md_file_name) == 0) {
+    if (isValidFileName(inex->meta.md_file_name) == 0) {
         puts("\tMESSAGE: Invalid fileName!");
-        return -1;
+        return 1;
     }
 
-    strncpy(fileNameExtension, inex->meta.md_file_name, FILE_NAME_LEN);
-    strncat(fileNameExtension, ".bin", 5);
+    /* add file extension (.bin) to use in file operation functions */
+    strncpy(completeFileName, inex->meta.md_file_name, FILE_NAME_LEN);
+    strncat(completeFileName, ".bin", 5);
 
-    fp = fopen(fileNameExtension, "wb");
+    fp = fopen(completeFileName, "wb");
     if (fp == NULL) {
         logError(ERROR_FILE_OPEN);
         return -1;
     }
 
     returnCode = writeInexDataIntoFile(inex, fp);
-    if (returnCode < 0) {
-        logError(ERROR_FILE_WRITE);
-        fclose(fp);
+    if (returnCode != 0) {
         removeInexFile(inex->meta.md_file_name);
+        fclose(fp);
         return returnCode;
     }
 
@@ -268,7 +268,7 @@ int removeInexFile(const char *fileName)
         return -1;
     }
         
-    if (fileNameValidity(fileName) == 0) {
+    if (isValidFileName(fileName) == 0) {
         puts("\tMESSAGE: Invalid FileName!");
         return -1;
     }
@@ -593,7 +593,7 @@ int filterRecord(InexDataPtr inex, char **token)
 
     /* if the first token itself is not 'filter', something is wrong */
     if (token[0] == NULL || strcmp(token[0], "filter") != 0) {
-        logError(ERROR_SOMETHING);
+        logError(ERROR_ARGUMENT);
         return -1;
     }
 
@@ -682,7 +682,7 @@ static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp)
 
     if (inex == NULL || fp == NULL) {
         logError(ERROR_ARGUMENT);
-        return -1;
+        return -2;
     }
 
     if (fwrite(&inex->meta, sizeof(inex->meta), 1, fp) != 1) {
@@ -711,7 +711,7 @@ static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp)
  *
  * return 1 - valid fileName 
  */
-static int fileNameValidity(const char *fileName) 
+static int isValidFileName(const char *fileName) 
 {
     int index; 
     char ch;
@@ -1091,7 +1091,7 @@ static int printRecord(struct record *rec)
         "\n|     | ";
 
     if (rec == NULL) {
-        //logError(ERROR_ARGUMENT);
+        logError(ERROR_ARGUMENT);
         return -1;
     }
 
