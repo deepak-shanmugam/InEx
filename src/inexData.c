@@ -58,6 +58,8 @@ static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp);
 static int isValidFileName(const char *fileName);
 static int fileExist(const char *fileName);
 static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec);
+static int insertListNode(InexDataPtr inex, ListNodePtr node);
+static int updateListNode(ListNodePtr node, struct record *rec);
 static void printCalculation(int no_of_rec, long income, long expense);
 
 /* filter related functions */
@@ -309,12 +311,10 @@ void listInexFile()
  * record with latest date should be added on Top (head)
  *
  * It is caller functions responsibility to send valid records
- * Note: Currently only allowing upto 99,999 records only
  */
 int addRecord(InexDataPtr inex, struct record *rec) 
 {
     ListNodePtr node;
-    ListNodePtr current;
 
     if (inex == NULL || rec == NULL) {
         logError(ERROR_ARGUMENT);
@@ -322,23 +322,21 @@ int addRecord(InexDataPtr inex, struct record *rec)
     }
 
     /*
-     * allow only 99,999 records (including deleted records)
-     * Future changes might be happen
-     *
+     * max signed int (2^31) 
+     *              : 2,147,483,648
+     * 
      * max_amount   : 999,999,999,999 
      * max_amount_with_decimal_digit in storage:
      *              : 99,999,999,999,999
-     * max_records  : 1,00,000 - 1 (99,999)
-     *
-     * max_amount (including decimal) x max_records
-     *              : 9,999,999,999,999,900,000
-     *
-     * max_long_value: (signed)
+     * 
+     * max_long_value: (signed - 2^63)
      *              : 9,223,372,036,854,775,808 
      *
-     * The above reason for restriction 
+     * The above reason for the below restrictions 
      */
-    if (inex->meta.md_counter > 99999) {
+    if (inex->meta.md_counter > 2147483000 ||
+            inex->meta.md_total_income > 9223200000000000000 ||
+            inex->meta.md_total_expense > 9223200000000000000) {
         puts("\tMESSAGE: Max record limit reached!");
         return 1;
     }
@@ -360,97 +358,92 @@ int addRecord(InexDataPtr inex, struct record *rec)
         inex->meta.md_total_expense += rec->r_amount;
     } 
 
-    current = inex->headNode;
-
-    /* if no exiting records */
-    if (inex->headNode == NULL) {
-        inex->headNode = node;
-        return 0;
-    }
-
-    /* if the new record needs to be in top */
-    if (compareDate(node->rec.r_date, current->rec.r_date) >= 0) {
-        node->next = inex->headNode;
-        inex->headNode = node;
-        return 0;
-    }
-
-    while(current != NULL) {
-        /* when tail is reached add the new record in the end */
-        if (current->next == NULL) {
-            current->next = node;
-            return 0;
-        }
-
-        /* if new record date is >= current->next record date */
-        if (compareDate(node->rec.r_date, current->next->rec.r_date) >= 0) {
-            node->next = current->next;
-            current->next = node;
-            return 0;
-        }
-
-        current = current->next;
-    }
-
-    return 0;
+    return insertListNode(inex, node);
 }
 
 
+/*
+ * Function to edit record of the InEx Data
+ * edit should happen only atleast one valid data is present
+ * Note: empty string also indicates invalid data here
+ *
+ * Return = 0, indicates successful edit
+ * return > 0, indicates No edit happened
+ * return < 0, indicates error  
+ */
 int editRecord(InexDataPtr inex, struct record *rec) 
 {
     ListNodePtr current;
-    int year, month, day;
-    int edited;
+    ListNodePtr next;
+    int updateDate  = 0;
+    int startEdit   = 0;
 
     if (inex == NULL || rec == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
+    current = inex->headNode;
+
     /* Existing ID are always lesser than current counter */
     if (rec->r_id >= inex->meta.md_counter) 
         return 1;
 
-    current = inex->headNode;
-    edited  = 0;
+    if (inex->headNode == NULL)
+        return 1;
+
+    /* 
+     * check if any fields are eligible to be updated 
+     */
+    if (rec->r_amount >= 0)
+        startEdit++;
+
+    if (isValidDate(rec->r_date.year, rec->r_date.month, rec->r_date.day)) {
+        updateDate = 1;
+        startEdit++;
+    }
+
+    if (strcmp(rec->r_entity, "") != 0) 
+        startEdit++;
+
+    if (strcmp(rec->r_comment, "") != 0)
+        startEdit++;
+        
+    /* if all fields are skipped, do not edit, just return */
+    if (startEdit == 0)
+        return 1;
+
+    /* if the first ListNode needs to be updated */
+    if (inex->headNode->rec.r_id == rec->r_id) {
+        metaUpdate(inex, inex->headNode, rec);
+        updateListNode(inex->headNode, rec);
+
+        /* if date field field updated, change the position of record */
+        if (updateDate) {
+            inex->headNode = current->next;
+            insertListNode(inex, current);
+        }
+
+        return 0;
+    }
 
     while(current != NULL) {
-        if (current->rec.r_id == rec->r_id) {
-            year    = rec->r_date.year;
-            month   = rec->r_date.month;
-            day     = rec->r_date.day;
+        next = current->next;
 
-            /* meta data updation */
-            metaUpdate(inex, current, rec);
-            
-            /* edit only eligible records */
-            if (rec->r_amount >= 0) {
-                current->rec.r_amount = rec->r_amount;
-                edited++;
+        /* if end reached (i.e., No ListNode found), just return */
+        if (next == NULL)
+            return 1;
+
+        /* if middle or last ListNode needs to be updated*/
+        if (next->rec.r_id == rec->r_id) {
+            metaUpdate(inex, next, rec);
+            updateListNode(next, rec);
+
+            /* if date field field updated, change the position of record */
+            if (updateDate) {
+                current->next = next->next;
+                insertListNode(inex, next);
             }
-
-            if (isValidDate(year, month, day)) {
-                current->rec.r_date = rec->r_date;
-                edited++;
-                /*
-                 *  pending implementation:
-                 *  change the record position in list based on new date
-                 */
-            }
-
-            if (strcmp(rec->r_entity, "") != 0) {
-                strncpy(current->rec.r_entity, rec->r_entity, ENTITY_LEN);
-                edited++;
-            }                
-
-            if (strcmp(rec->r_comment, "") != 0) {
-                strncpy(current->rec.r_comment, rec->r_comment, COMMENT_LEN);
-                edited++;
-            }
-
-            /* to indicate if any field is actually got edited or not */
-            if (edited == 0)
-                return 1;
 
             return 0;
         }
@@ -518,6 +511,14 @@ int deleteRecord(InexDataPtr inex, int record_id)
 }
 
 
+/*
+ * Function to view the records based on the arguments
+ * all              - indicates all records
+ * count (int)      - indicates no of latest records to view
+ * if no arguments   - then latest 15 records will be shown
+ * 
+ * Can be viewed only in console 
+ */
 int viewRecord(InexDataPtr inex, const char *argument)
 {
     ListNodePtr current = inex->headNode;
@@ -569,10 +570,10 @@ int viewRecord(InexDataPtr inex, const char *argument)
             count--;
     }
 
-    puts("");
-    printCalculation(no_of_rec, income, expense);
-
     printRecordFooter();
+
+    printCalculation(no_of_rec, income, expense);
+    puts("");
 
     return 0;
 }
@@ -837,6 +838,82 @@ static int metaUpdate(InexDataPtr inex, ListNodePtr node, struct record *rec)
 
 
 /*
+ * Function to insert node into correct position of the list
+ */
+static int insertListNode(InexDataPtr inex, ListNodePtr node)
+{
+    ListNodePtr current;
+
+    if (inex == NULL || node == NULL)
+        return -1;
+
+    current     = inex->headNode;
+    node->next  = NULL;
+
+    /* if no exiting records */
+    if (inex->headNode == NULL) {
+        inex->headNode = node;
+        return 0;
+    }
+
+    /* if the new record needs to be in top */
+    if (compareDate(node->rec.r_date, current->rec.r_date) >= 0) {
+        node->next      = inex->headNode;
+        inex->headNode  = node;
+        return 0;
+    }
+
+    while (current != NULL) {
+        /* when tail is reached add the new record in the end */
+        if (current->next == NULL) {
+            current->next = node;
+            return 0;
+        }
+
+        /* if new record date is >= current->next record date */
+        if (compareDate(node->rec.r_date, current->next->rec.r_date) >= 0) {
+            node->next      = current->next;
+            current->next   = node;
+            return 0;
+        }
+
+        current = current->next;
+    }
+
+    return 1;
+} 
+
+
+/*
+ * Function to update the record of a node 
+ */
+static int updateListNode(ListNodePtr node, struct record *rec)
+{
+    if (node == NULL || rec == NULL)
+        return -1;
+
+    /* 
+     * update each field seperately 
+     * based on the conditions of each field 
+     */
+
+    if (rec->r_amount >= 0)
+        node->rec.r_amount = rec->r_amount;
+
+    if (isValidDate(rec->r_date.year, rec->r_date.month, rec->r_date.day))
+        node->rec.r_date = rec->r_date;
+
+    if (strcmp(rec->r_entity, "") != 0)
+        strncpy(node->rec.r_entity, rec->r_entity, ENTITY_LEN);
+
+    if (strcmp(rec->r_comment, "") != 0)
+        strncpy(node->rec.r_comment, rec->r_comment, COMMENT_LEN);
+
+    return 0;
+} 
+
+
+/*
  * Function to print the metaData based on the function argument data 
  */
 static void printCalculation(int no_of_rec, long income, long expense) 
@@ -1076,42 +1153,33 @@ static int isRecordUnderAmountRange(struct record *rec, long *a1, long *a2)
 
 
 /*
- * Temporary way of printing records
+ * Temporary way of printing records 
  */
 static int printRecord(struct record *rec) 
 {
     static char type[4];
-    static const char *rec_footer = 
-        "\n|-----|"
-        "-------|"
-        "-----------------|"
-        "------------|"
-        "---------------------------------|";
-    static const char *empty_block = 
-        "\n|     | ";
+    static const char *row_seperator_text = 
+        "-----|-----------------|------------|---------------------------------|";
 
     if (rec == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
 
-    strcpy(type,"");
+    strcpy(type," x ");
 
     if (rec->r_info & 1)
         strcpy(type,"+IN");
 
-    printf("| %3s | %5d   %12ld.%02ld   %04d-%02d-%02d   %-31s  "
-        , type, rec->r_id, (rec->r_amount / 100), (rec->r_amount % 100)
+    printf(" %3s | %12ld.%02ld | %04d-%02d-%02d | %s\n\n"
+        , type, (rec->r_amount / 100), (rec->r_amount % 100) 
         , rec->r_date.year, rec->r_date.month, rec->r_date.day
         , rec->r_entity);
 
-    printf("%s",empty_block);
-    printf("%s",empty_block);
-    printf("COMMENT : ");
+    printf("     ID      : %d\n", rec->r_id);
+    printf("     COMMENT : ");
     printComment(rec->r_comment);
-    printf("%s",empty_block);
-        
-    puts(rec_footer);
+    printf("\n\n%s\n", row_seperator_text);
 
     return 0;
 } 
@@ -1123,28 +1191,17 @@ static int printRecord(struct record *rec)
 static void printRecordHeader() 
 {
     static const char *record_header =
-        "\n\t<-----LIST OF RECORDS----->\n"
-
-        "\n|-----|"                             // 7
-        "-------|"                              // 13 - 5 = 8
-        "-----------------|"                    // 21 - 3 = 18
-        "------------|"                         // 13
-        "---------------------------------|"    // 34
-
-        "\n| ??? |"
-        "    ID |"
-        "          AMOUNT |"
-        "       DATE |"
-        " ENTITY                          |"
-
-        "\n|-----|"
-        "-------|"
-        "-----------------|"
-        "------------|"
-        "---------------------------------|";
-
+        "\n\t<------LIST OF RECORDS------>\n";
+    static const char *header_column_text = 
+        " ??? |          AMOUNT |       DATE | ENTITY ";
+    static const char *row_seperator_text = 
+        "-----|-----------------|------------|---------------------------------|";
+        
     puts(record_header);
-}
+    puts(row_seperator_text);
+    puts(header_column_text);
+    puts(row_seperator_text);
+} 
 
 
 /*
@@ -1153,31 +1210,30 @@ static void printRecordHeader()
 static void printRecordFooter() 
 {
     static const char *record_footer =
-        "\n\t<-------END OF LIST------->\n";
+        "\n\t<--------END OF LIST-------->\n";
         
     puts(record_footer);
 } 
 
 
 /*
- * Temporary method to print comment section
+ * Temporary method to print comment section 
  */
 static void printComment(const char *comment)
 {
     int index = 0;
-    static const char *initial_space =
-        "\n|     |           ";
+    static const char *blank_space =
+        "\n               ";
 
     if (comment == NULL)
         return;
 
     while (comment[index] != '\0') {
-        if (index % 60 == 0 && index != 0)
-            printf("%s", initial_space);
+        if (index % 54 == 0 && index != 0) 
+            printf("%s", blank_space);
 
         printf("%c", comment[index]);
 
         index++;
     }
-    
 } 

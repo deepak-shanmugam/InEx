@@ -538,11 +538,6 @@ static int filter_wrapper(AppDataPtr appData)
 
 static int info_wrapper(AppDataPtr appData) 
 {
-    static const char *info_header =
-        "\n\t<-----Start of INFO----->\n";
-    static const char *info_footer =
-        "\n\t<------End of INFO------>\n";
-
     int returnCode;
 
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
@@ -555,7 +550,7 @@ static int info_wrapper(AppDataPtr appData)
         return 1;
     }
 
-    puts(info_header);
+    puts("");
 
     returnCode = infoInexData(appData->inex);
     if (returnCode != 0) 
@@ -568,7 +563,7 @@ static int info_wrapper(AppDataPtr appData)
         puts("*not saved");
     }
 
-    puts(info_footer);
+    puts("");
 
     return returnCode;
 } 
