@@ -1,15 +1,14 @@
 /*
- * main.c
+ * client.c (renamed) 
  *
  *  Created on: 26-Jun-2024
  *      Author: deepaks
  */
- 
+
 #include <stdio.h>
 
+#include "headers/appInfo.h"
 #include "headers/command.h"
-
-static void app_header();
 
 
 int main(int argc, char *argv[]) 
@@ -33,12 +32,4 @@ int main(int argc, char *argv[])
     destroyAppData(appData);
 
     return 0;
-} 
-
-
-static void app_header() 
-{
-    puts("Welcome to InEx, copyright (c) 2024 Deepak Shanmugam");
-    puts("GNU general public license");
-    puts("Enter 'help' or 'about' command to know more\n");
 } 

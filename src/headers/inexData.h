@@ -26,9 +26,9 @@ void listInexFile();
 
 
 /* InEx Record operations */
-int addRecord(InexDataPtr inex, struct record *rec);
+int addRecord(InexDataPtr inex, Record *rec);
 
-int editRecord(InexDataPtr inex, struct record *rec);
+int editRecord(InexDataPtr inex, Record *rec);
 
 int deleteRecord(InexDataPtr inex, int record_id);
 

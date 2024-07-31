@@ -12,13 +12,24 @@
 static void show_license(void);
 
 
+void app_header() 
+{
+    static char *app_header_text = 
+        "Welcome to InEx, copyright (c) 2024 Deepak Shanmugam\n"
+        "GNU general public license\n"
+        "Enter 'help' or 'about' command to know more\n";
+
+    puts(app_header_text);
+} 
+
+
 void about(void) 
 { 
     static const char *about_text = 
         "\n\tInEx - CLI based Income and Expense tracking application"
         "\n\tcopyright (c) 2024, Deepak Shanmugam"
         "\n\tLicense: GNU GENERAL PUBLIC LICENSE"
-        "\n\tversion: 0.9.1 (BETA)"
+        "\n\tversion: 0.9.2 (BETA)"
         "\n\tcontact: deepdeepdeepak@outlook.com";
 
     puts(about_text);

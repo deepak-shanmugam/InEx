@@ -12,13 +12,13 @@
 #include <string.h>
 
 #include "headers/command.h"
-#include "headers/inexData.h"
-#include "headers/appInfo.h"
+#include "headers/consoleInput.h"
 #include "headers/customError.h"
-#include "headers/dataDefinition.h"
-#include "headers/dataFunction.h"
+#include "headers/inexData.h"
+#include "headers/recordFunction.h"
+#include "headers/appInfo.h"
 
-#define CMD_LEN         512
+#define CMD_LEN         256
 #define MAX_TOKEN       10 
 #define SAVE_INPUT_LEN  16
 
@@ -41,7 +41,7 @@ struct appData {
 };
 
 
-/* wrapper functions */
+/* static wrapper functions */
 static int generic_wrapper(AppDataPtr appData);
 static int quit_wrapper(AppDataPtr appData);
 static int help_wrapper(AppDataPtr appData);
@@ -62,16 +62,13 @@ static int info_wrapper(AppDataPtr appData);
 static int save_wrapper(AppDataPtr appData);
 static int close_wrapper(AppDataPtr appData);
 
-
 /* other static functions */
 static int getCommand(AppDataPtr appData);
 static int setToken(AppDataPtr appData);
 static int isSpace(char ch);
 static int printCommandPrompt(AppDataPtr appData);
 static int saveConfirmation(void);
-static int getRecord(struct record *rec, int mandatoryCheck);
 // static void showToken(AppDataPtr appData);
-// static void putRecord(struct record *rec);
 
 
 /* Declaring static Lookup table */
@@ -358,8 +355,8 @@ static int list_wrapper(AppDataPtr appData)
 
 static int add_wrapper(AppDataPtr appData) 
 {
-    struct record temp_record = {0};
-    int returnCode;
+    Record rec;
+    int returnCode  = 0;
 
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
         logError(ERROR_ARGUMENT);
@@ -371,34 +368,35 @@ static int add_wrapper(AppDataPtr appData)
         return 1;
     }
 
-    temp_record.r_info  = -1;
-    returnCode          = 0;
+    rec.r_id    = 0;
+    rec.r_info  = -1;
 
     if (appData->token[1] == NULL)
         return 1;
 
     if (strcmp(appData->token[1], "in") == 0)
-        temp_record.r_info = 1;
+        rec.r_info = 1;
 
     if (strcmp(appData->token[1], "ex") == 0)
-        temp_record.r_info = 0;
+        rec.r_info = 0;
 
-    if (temp_record.r_info < 0) {
+    if (rec.r_info < 0) {
         puts("\tMESSAGE: Enter valid arguments!");
         return 1;
     }
 
     /* get record from user, 1 (non-zero) indicates mandatory field check */
-    returnCode = getRecord(&temp_record, 1); 
-    if (returnCode != 0) {
-        if (returnCode > 0)
-            puts("\tMESSAGE: Enter valid values in Mandatory field!");
+    returnCode = getRecordFromConsole(&rec, 1); 
+    if (returnCode < 0) {
+        logError(ERROR_INPUT);
+        return -1;
+    }
+    if (returnCode > 0) {
+        puts("\tMESSAGE: Enter valid values in Mandatory field!");
         return returnCode;
     }
 
-    // putRecord(&temp_record);    // debug
-
-    returnCode = addRecord(appData->inex, &temp_record);
+    returnCode = addRecord(appData->inex, &rec);
     if (returnCode != 0) {
         puts("\tMESSAGE: No record is added!");
         return 1;
@@ -412,8 +410,8 @@ static int add_wrapper(AppDataPtr appData)
 
 static int edit_wrapper(AppDataPtr appData) 
 {
-    struct record temp_record = {0};
-    int returnCode;
+    Record rec;
+    int returnCode  = 0;
 
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
         logError(ERROR_ARGUMENT);
@@ -425,25 +423,23 @@ static int edit_wrapper(AppDataPtr appData)
         return 1;
     }
 
-    returnCode  = 0;
-
     if (appData->token[1] == NULL)
         return 1;
 
-    returnCode = sscanf(appData->token[1],"%d",&temp_record.r_id);
-    if (returnCode <= 0 || temp_record.r_id < 0) {
+    returnCode = sscanf(appData->token[1],"%d",&rec.r_id);
+    if (returnCode <= 0 || rec.r_id < 0) {
         puts("\tMESSAGE: Enter valid arguments!");
         return 1;
     }
 
     /* get record from user, 0 passed to ignore mandatory field check */
-    returnCode = getRecord(&temp_record, 0);   
-    if (returnCode != 0) 
-        return returnCode;
-
-    // putRecord(&temp_record);    //debug
+    returnCode = getRecordFromConsole(&rec, 0);   
+    if (returnCode < 0) {
+        logError(ERROR_INPUT);
+        return -1;
+    }
     
-    returnCode = editRecord(appData->inex, &temp_record);
+    returnCode = editRecord(appData->inex, &rec);
     if (returnCode != 0) {
         puts("\tMESSAGE: No record is edited!");
         return 1;
@@ -792,58 +788,6 @@ static int saveConfirmation(void)
 
 
 /*
- * Function to get record from the user
- */
-static int getRecord(struct record *rec, int mandatoryCheck) 
-{
-    int returnCode;
-
-    if (rec == NULL)
-        return -2;
-
-    printf("   %cAmount            : ", (mandatoryCheck != 0) * 42);
-    returnCode = getAmountFromConsole(&rec->r_amount);
-    if (returnCode < 0) {
-        logError(ERROR_INPUT);
-        return -1;
-    }
-    if (returnCode == 0) {
-        rec->r_amount = -1;     // indication to ignore during edit 
-        if (mandatoryCheck)
-            return 1;
-    }
-
-    printf("   %cDate [yyyy-mm-dd] : ", (mandatoryCheck != 0) * 42);
-    returnCode = getDateFromConsole(&rec->r_date);
-    if (returnCode < 0) {
-        logError(ERROR_INPUT);
-        return -1;
-    }
-    if (returnCode == 0) {
-        rec->r_date.day = 0;    // indication to ignore during edit 
-        if (mandatoryCheck)
-            return 1;
-    }
-
-    printf("   %cEntity            : ", (mandatoryCheck != 0) * 32);
-    returnCode = getStringFromConsole(rec->r_entity, ENTITY_LEN);
-    if (returnCode < 0) {
-        logError(ERROR_INPUT);
-        return -1;
-    }
-
-    printf("   %ccomment           : ", (mandatoryCheck != 0) * 32);
-    returnCode = getStringFromConsole(rec->r_comment, COMMENT_LEN);
-    if (returnCode < 0) {
-        logError(ERROR_INPUT);
-        return -1;
-    }
-
-    return 0;
-} 
-
-
-/*
 // only for debugging
 static void showToken(AppDataPtr appData) 
 {
@@ -854,22 +798,4 @@ static void showToken(AppDataPtr appData)
         index++;
     }
 }
-*/
-
-
-/*
-// only for debugging
-static void putRecord(struct record *rec) 
-{
-    if (rec == NULL)
-        return;
-
-    printf("\n<debug-data>\n");
-    printf("id: %d\n", rec->r_id);
-    printf("info: %d\n", rec->r_info);
-    printf("Amount: %ld\n", rec->r_amount);
-    printf("Date: %d-%d-%d\n", rec->r_date.year, rec->r_date.month, rec->r_date.day);
-    printf("Entity: %s\n", rec->r_entity);
-    printf("Comment: %s\n", rec->r_comment);
-} 
 */ 

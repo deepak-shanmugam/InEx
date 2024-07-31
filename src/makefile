@@ -4,14 +4,14 @@ CFLAGS	= -Wall -g -pg
 
 all: program
 
-program: main.o command.o inexData.o customError.o appInfo.o dataFunction.o
+program: client.o command.o inexData.o customError.o appInfo.o recordFunction.o consoleInput.o
 	@echo "\nLinking object files"
-	$(CC) $(CFLAGS) main.o command.o inexData.o customError.o appInfo.o dataFunction.o -o program
+	$(CC) $(CFLAGS) client.o command.o inexData.o customError.o appInfo.o recordFunction.o consoleInput.o -o program
 
-main.o: main.c 
-	@echo "\nCompiling: main.c"
-	$(CC) $(CFLAGS) -c main.c
-#	$(CC) $(CFLAGS) $(INCLUDE) -c main.c
+client.o: client.c 
+	@echo "\nCompiling: client.c"
+	$(CC) $(CFLAGS) -c client.c
+#	$(CC) $(CFLAGS) $(INCLUDE) -c client.c
 
 command.o: command.c
 	@echo "\nCompiling: command.c"
@@ -28,15 +28,20 @@ appInfo.o: appInfo.c
 	$(CC) $(CFLAGS) -c appInfo.c
 #	$(CC) $(CFLAGS) $(INCLUDE) -c appInfo.c
 
-dataFunction.o: dataFunction.c 
-	@echo "\nCompiling: dataFunction.c"
-	$(CC) $(CFLAGS) -c dataFunction.c
-#	$(CC) $(CFLAGS) $(INCLUDE) -c dataFunction.c
+recordFunction.o: recordFunction.c 
+	@echo "\nCompiling: recordFunction.c"
+	$(CC) $(CFLAGS) -c recordFunction.c
+#	$(CC) $(CFLAGS) $(INCLUDE) -c recordFunction.c
 
 customError.o: customError.c 
 	@echo "\nCompiling: customError.c"
 	$(CC) $(CFLAGS) -c customError.c
 #	$(CC) $(CFLAGS) $(INCLUDE) -c customError.c
+
+consoleInput.o: consoleInput.c 
+	@echo "\nCompiling: consoleInput.c"
+	$(CC) $(CFLAGS) -c consoleInput.c
+#	$(CC) $(CFLAGS) $(INCLUDE) -c consoleInput.c
 
 clean:
 	@echo "\nRemoving object and output files!"

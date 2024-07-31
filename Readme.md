@@ -16,7 +16,7 @@ make
 > (or) using gcc:
 
 ```
-gcc -o program main.c command.c inexData.c dataFunction.c appInfo.c customError.c 
+gcc -o program client.c command.c inexData.c recordFunction.c consoleInput.c customError.c appInfo.c 
 ```
 
 # Run
