@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 #include "headers/recordFunction.h"
 #include "headers/consoleInput.h"
@@ -185,9 +186,7 @@ int parseStringToAmount(const char *str, long *amount)
 
 
 /*
- * Function to check if a valid date or not
- *
- * Return != 0 (non-zero), indicates valid date 
+ * return value of non-zero, indicates valid one
  */
 int isValidDate(const Date *date)  
 {
@@ -199,9 +198,7 @@ int isValidDate(const Date *date)
 
 
 /*
- * Function to check if a valid amount or not
- *
- * Return != 0 (non-zero), indicates valid amount 
+ * return value of non-zero, indicates valid one
  */
 int isValidAmount(const long *amount) 
 {
@@ -216,87 +213,93 @@ int isValidAmount(const long *amount)
 
 
 /*
- * To Validate if the rec is valid 
- *
- * Return 1 (non-zero), only if all fields are valid 
+ * return value of non-zero, indicates valid one
  */
 int isValidRecord(const Record *rec)
 {
-    /* 63 indicates all the first 6 bits as 1 */
-    int validity = 63;
-
     if (rec == NULL)
         return 0;
 
-    if ((recordValidityCode(rec) & validity) == validity)
+    if (isValidRecordId(rec) == 0)
+        return 0;
+
+    if (isValidRecordInfo(rec) == 0)
+        return 0;
+
+    if (isValidDate(&rec->r_date) == 0)
+        return 0;
+
+    if (isValidAmount(&rec->r_amount) == 0)
+        return 0;
+
+    if (isValidRecordEntity(rec) == 0)
+        return 0;
+
+    if (isValidRecordComment(rec) == 0)
+        return 0;
+    
+    return 1;
+} 
+
+
+/*
+ * return value of non-zero, indicates valid one
+ */
+int isValidRecordId(const Record *rec) {
+    if (rec == NULL)
+        return 0;
+
+    if (rec->r_id >= 0 && rec->r_id < INT_MAX)
         return 1;
-    
+
     return 0;
-} 
+}
 
 
 /*
- * To check the record validity 
- * Return code determintes record validity
- *
- * if 1-st bit is 1, id is valid         1
- * if 2-nd bit is 1, info is valid       2    
- * if 3-rd bit is 1, date is valid       4
- * if 4-th bit is 1, amount is valid     8
- * if 5-th bit is 1, entity is valid    16
- * if 6-th bit is 1, comment is valid   32
- */ 
-int recordValidityCode(const Record *rec) 
-{
-    int code = 0;
-    int flag = 1; /* Initialize flag */
-
+ * return value of non-zero, indicates valid one
+ */
+int isValidRecordInfo(const Record *rec) {
     if (rec == NULL)
         return 0;
 
-    /* Id - validity */
-    if (rec->r_id >= 0 && rec->r_id <= MAX_ID) 
-        code = (code | flag);
-    
-    flag <<= 1;
+    if (rec->r_info >= 0 && rec->r_info < INT_MAX)
+        return 1;
 
-    /* Info - validity */
-    if (rec->r_info >= 0) 
-        code = (code | flag);
-    
-    flag <<= 1;
-
-    /* Date - validity */
-    if (isValidDate(&rec->r_date)) 
-        code = (code | flag);
-
-    flag <<= 1;
-
-    /* Amount - validity */
-    if (isValidAmount(&rec->r_amount))
-        code = (code | flag);
-
-    flag <<= 1;
-
-    /* Entity - validity */
-    if (strnlen(rec->r_entity, ENTITY_LEN) < ENTITY_LEN) 
-        code = (code | flag);
-
-    flag <<= 1;
-
-    /* Comment - validity */
-    if (strnlen(rec->r_comment, COMMENT_LEN) < COMMENT_LEN) 
-        code = (code | flag);
-
-    return code;
-} 
+    return 0;
+}
 
 
 /*
- * Function to check if the Date of the record falls between the range
- * Note: Either upper or lower range limit can be ignored
- * 
- * return 1 - indicates record falls under the range
+ * return value of non-zero, indicates valid one
+ */
+int isValidRecordEntity(const Record *rec) {
+    if (rec == NULL)
+        return 0;
+
+    if (strnlen(rec->r_entity, ENTITY_LEN) < ENTITY_LEN)
+        return 1;
+
+    return 0;
+}
+
+
+/*
+ * return value of non-zero, indicates valid one
+ */
+int isValidRecordComment(const Record *rec) {
+    if (rec == NULL)
+        return 0;
+
+    if (strnlen(rec->r_comment, COMMENT_LEN) < COMMENT_LEN)
+        return 1;
+
+    return 0;
+}
+
+
+/*
+ * return value of non-zero, indicates Yes or Success 
  */
 int isRecordBetweenDateRange(const Record *rec, Date *d1, Date *d2)
 {
@@ -324,10 +327,7 @@ int isRecordBetweenDateRange(const Record *rec, Date *d1, Date *d2)
 
 
 /*
- * Function to check if the Amount of the record falls between the range
- * Note: Either upper or lower range limit can be ignored
- * 
- * return 1 - indicates record falls under the range
+ * return value of non-zero, indicates Yes or Success 
  */
 int isRecordBetweenAmountRange(const Record *rec, long *a1, long *a2)
 {
@@ -403,7 +403,7 @@ int copyRecord(Record *dest, Record *src)
 
 
 /*
- * Temporary way of printing records 
+ * To print record in console with a line seperator at the end 
  */
 int printRecordInConsole(const Record *rec) 
 {
@@ -432,7 +432,7 @@ int printRecordInConsole(const Record *rec)
 
 
 /*
- * Temporary record header
+ * to print record header including column name in console
  */
 void printRecordHeaderInConsole() 
 {    
@@ -444,7 +444,7 @@ void printRecordHeaderInConsole()
 
 
 /*
- * Temporary record footer
+ * to print record footer in console
  */
 void printRecordFooterInConsole() 
 {    
@@ -453,7 +453,7 @@ void printRecordFooterInConsole()
 
 
 /*
- * Function to print the metaData based on the function argument data 
+ * Function to print the metaData based on the function arguments 
  */
 void printCalculationInConsole(int no_of_rec, long income, long expense) 
 {
@@ -538,7 +538,7 @@ static int isValidDateField(int year, int month, int day)
 
 
 /*
- * Temporary method to print comment section 
+ * to print record comment in console with some format  
  */
 static void printCommentInConsole(const char *comment)
 {

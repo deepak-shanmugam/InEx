@@ -25,7 +25,13 @@ int isValidDate(const Date *date);
 
 int isValidRecord(const Record *rec);
 
-int recordValidityCode(const Record *rec);
+int isValidRecordId(const Record *rec);
+
+int isValidRecordInfo(const Record *rec);
+
+int isValidRecordEntity(const Record *rec);
+
+int isValidRecordComment(const Record *rec);
 
 int isRecordBetweenDateRange(const Record *rec, Date *d1, Date *d2);
 

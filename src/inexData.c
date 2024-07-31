@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "headers/inexData.h"
 #include "headers/customError.h"
@@ -331,30 +332,28 @@ void listInexFile()
 int addRecord(InexDataPtr inex, Record *rec) 
 {
     ListNodePtr node;
+    int remaining_id        = 0;
+    long remaining_income   = 0;
+    long remaining_expense  = 0;
 
     if (inex == NULL || rec == NULL) {
         logError(ERROR_ARGUMENT);
         return -2;
     }
 
-    /*
-     * max signed int (2^31) 
-     *              : 2,147,483,648
-     * 
-     * max_amount   : 999,999,999,999 
-     * max_amount_with_decimal_digit in storage:
-     *              : 99,999,999,999,999
-     * 
-     * max_long_value: (signed - 2^63)
-     *              : 9,223,372,036,854,775,808 
-     *
-     * The above reason for the below restrictions 
-     */
-    if (inex->meta.md_counter > MAX_ID ||
-            inex->meta.md_total_income > MAX_AMOUNT_ADDITION ||
-            inex->meta.md_total_expense > MAX_AMOUNT_ADDITION) {
-        puts("\tMESSAGE: Max record limit reached!");
+    if (isValidRecord(rec) == 0)
         return 1;
+
+    /* Logics to cover application limitation scenario */
+    remaining_id        = INT_MAX - inex->meta.md_counter;
+    remaining_income    = LONG_MAX - inex->meta.md_total_income;
+    remaining_expense   = LONG_MAX - inex->meta.md_total_expense;
+
+    /* if app limit reaches, do not allow any more records to be added */
+    if (remaining_id <= 0 || remaining_income <= MAX_AMOUNT 
+            || remaining_expense <= MAX_AMOUNT) {
+        puts("\tMESSAGE: Application limit reached!");
+        return 2;
     }
 
     node = calloc(1, sizeof(*node));
@@ -375,7 +374,7 @@ int addRecord(InexDataPtr inex, Record *rec)
     } 
 
     return insertListNode(inex, node);
-}
+} 
 
 
 /*
@@ -391,15 +390,12 @@ int editRecord(InexDataPtr inex, Record *rec)
 {
     ListNodePtr current;
     ListNodePtr next;
-    int updateDate  = 0;
-    int startEdit   = 0;
+    int no_of_field_update = 0;
 
     if (inex == NULL || rec == NULL) {
         logError(ERROR_ARGUMENT);
         return -1;
     }
-
-    current = inex->headNode;
 
     /* Existing ID are always lesser than current counter */
     if (rec->r_id >= inex->meta.md_counter) 
@@ -408,36 +404,21 @@ int editRecord(InexDataPtr inex, Record *rec)
     if (inex->headNode == NULL)
         return 1;
 
-    /* 
-     * check if any fields are eligible to be updated 
-     */
-    if (isValidAmount(&rec->r_amount))
-        startEdit++;
-
-    if (isValidDate(&rec->r_date)) {
-        updateDate = 1;
-        startEdit++;
-    }
-
-    if (strcmp(rec->r_entity, "") != 0) 
-        startEdit++;
-
-    if (strcmp(rec->r_comment, "") != 0)
-        startEdit++;
-        
-    /* if all fields are skipped, do not edit, just return */
-    if (startEdit == 0)
-        return 1;
+    current = inex->headNode;
 
     /* if the first ListNode needs to be updated */
     if (inex->headNode->rec.r_id == rec->r_id) {
         metaUpdate(inex, inex->headNode, rec);
-        updateListNode(inex->headNode, rec);
+        no_of_field_update = updateListNode(inex->headNode, rec);
+
+        if (no_of_field_update <= 0)
+            return 1;
+
         /* 
-         * if date field field updated, change the position of record 
+         * if date field updated, change the position of record Node 
          * by detaching Node from current position, and insert it again
          */
-        if (updateDate) {
+        if (isValidDate(&rec->r_date)) {
             inex->headNode = current->next;
             insertListNode(inex, current);
         }
@@ -455,12 +436,16 @@ int editRecord(InexDataPtr inex, Record *rec)
         /* if middle or last ListNode needs to be updated*/
         if (next->rec.r_id == rec->r_id) {
             metaUpdate(inex, next, rec);
-            updateListNode(next, rec);
+            no_of_field_update = updateListNode(next, rec);
+
+            if (no_of_field_update <= 0)
+                return 1;
+            
             /* 
-             * if date field field updated, change the position of record 
+             * if date field updated, change the position of record Node
              * by detaching Node from current position, and insert it again
              */
-            if (updateDate) {
+            if (isValidDate(&rec->r_date)) {
                 current->next = next->next;
                 insertListNode(inex, next);
             }
@@ -904,32 +889,45 @@ static int insertListNode(InexDataPtr inex, ListNodePtr node)
 
 /*
  * Function to update the record of a node 
+ *
+ * Returns no of fields updated
+ * Return < 0, indicates error 
  */
 static int updateListNode(ListNodePtr node, Record *rec)
 {
+    int no_of_field_update = 0;
+
     if (node == NULL || rec == NULL)
         return -1;
 
     /* 
      * update each field seperately 
-     * based on the conditions of each field 
+     * based on the validity of each field 
      */
 
-    if (rec->r_amount >= 0 && rec->r_amount < MAX_AMOUNT)
+    if (isValidAmount(&rec->r_amount)) {
         node->rec.r_amount = rec->r_amount;
+        no_of_field_update++;
+    }
 
-    if (isValidDate(&rec->r_date))
+    if (isValidDate(&rec->r_date)) {
         node->rec.r_date = rec->r_date;
+        no_of_field_update++;
+    }
 
-    /* update only when the incoming string is non-empty */
-    if (strcmp(rec->r_entity, "") != 0)
+    /* update only when the incoming string is valid and non-empty */
+    if (isValidRecordEntity(rec) && strcmp(rec->r_entity, "") != 0) {
         strncpy(node->rec.r_entity, rec->r_entity, ENTITY_LEN);
+        no_of_field_update++;
+    }
 
-    /* update only when the incoming string is non-empty */
-    if (strcmp(rec->r_comment, "") != 0)
+    /* update only when the incoming string is valid and non-empty */
+    if (isValidRecordComment(rec) && strcmp(rec->r_comment, "") != 0) {
         strncpy(node->rec.r_comment, rec->r_comment, COMMENT_LEN);
+        no_of_field_update++;
+    }
 
-    return 0;
+    return no_of_field_update;
 } 
 
 

@@ -29,7 +29,7 @@ void about(void)
         "\n\tInEx - CLI based Income and Expense tracking application"
         "\n\tcopyright (c) 2024, Deepak Shanmugam"
         "\n\tLicense: GNU GENERAL PUBLIC LICENSE"
-        "\n\tversion: 0.9.2 (BETA)"
+        "\n\tversion: 0.9.3 (BETA)"
         "\n\tcontact: deepdeepdeepak@outlook.com";
 
     puts(about_text);

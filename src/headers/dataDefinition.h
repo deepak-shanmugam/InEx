@@ -3,11 +3,7 @@
 
 #define ENTITY_LEN      32
 #define COMMENT_LEN     128
-
-#define MAX_ID              2147483000 
-#define MAX_AMOUNT          99999999999999
-#define MAX_AMOUNT_ADDITION 9223200000000000000 
-
+#define MAX_AMOUNT      99999999999999
 
 typedef struct date {
     int day;
