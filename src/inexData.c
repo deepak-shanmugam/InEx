@@ -226,7 +226,7 @@ int saveInexData(InexDataPtr inex)
     fp = fopen(completeFileName, "wb");
     if (fp == NULL) {
         logError(ERROR_FILE_OPEN);
-        return -1;
+        return -3;
     }
 
     returnCode = writeInexDataIntoFile(inex, fp);
@@ -280,11 +280,11 @@ int removeInexFile(const char *fileName)
     char fileNameExtension[FILE_NAME_LEN];
 
     if (fileName == NULL) 
-        return 2;
+        return -2;
         
     if (isValidFileName(fileName) == 0) {
         puts("\tMESSAGE: Invalid FileName!");
-        return 3;
+        return 1;
     }
 
     strncpy(fileNameExtension, fileName, FILE_NAME_LEN);
@@ -292,7 +292,7 @@ int removeInexFile(const char *fileName)
 
     if (fileExist(fileNameExtension) == 0) {
         puts("\tMESSAGE: File doesn't exist!");
-        return 4;
+        return 2;
     }
 
     /*
@@ -301,7 +301,7 @@ int removeInexFile(const char *fileName)
 
     if (remove(fileNameExtension) != 0) {
         logError(ERROR_FILE_REMOVE);
-        return 1;
+        return -1;
     }
 
     return 0;
@@ -388,11 +388,11 @@ int editRecord(InexDataPtr inex, Record *rec)
 {
     ListNodePtr current;
     ListNodePtr next;
-    int no_of_field_update = 0;
+    int no_of_field_updated = 0;
 
     if (inex == NULL || rec == NULL) {
         logError(ERROR_FUNC_ARG);
-        return -1;
+        return -2;
     }
 
     /* Existing ID are always lesser than current counter */
@@ -407,10 +407,10 @@ int editRecord(InexDataPtr inex, Record *rec)
     /* if the first ListNode needs to be updated */
     if (inex->headNode->rec.r_id == rec->r_id) {
         metaUpdate(inex, inex->headNode, rec);
-        no_of_field_update = updateListNode(inex->headNode, rec);
+        no_of_field_updated = updateListNode(inex->headNode, rec);
 
-        if (no_of_field_update <= 0)
-            return 1;
+        if (no_of_field_updated <= 0)
+            return 2;
 
         /* 
          * if date field updated, change the position of record Node 
@@ -434,10 +434,10 @@ int editRecord(InexDataPtr inex, Record *rec)
         /* if middle or last ListNode needs to be updated*/
         if (next->rec.r_id == rec->r_id) {
             metaUpdate(inex, next, rec);
-            no_of_field_update = updateListNode(next, rec);
+            no_of_field_updated = updateListNode(next, rec);
 
-            if (no_of_field_update <= 0)
-                return 1;
+            if (no_of_field_updated <= 0)
+                return 2;
             
             /* 
              * if date field updated, change the position of record Node
@@ -468,10 +468,14 @@ int deleteRecord(InexDataPtr inex, int record_id)
 
     if (inex == NULL || record_id < 0) {
         logError(ERROR_FUNC_ARG);
-        return -1;
+        return -2;
     }
 
     current = inex->headNode;
+
+    /* Existing ID are always lesser than current counter */
+    if (record_id >= inex->meta.md_counter) 
+        return 1;
 
     /* if no existing records */
     if (current == NULL)
@@ -532,7 +536,7 @@ int viewRecord(InexDataPtr inex, const char *argument)
 
     if (inex == NULL) {
         logError(ERROR_FUNC_ARG);
-        return -1;
+        return -2;
     }
 
     /*
@@ -547,7 +551,7 @@ int viewRecord(InexDataPtr inex, const char *argument)
         } else {
             if (sscanf(argument,"%d",&count) <= 0 || count < 0) {
                 puts("\tMESSAGE: Invalid command arguments!");
-                return -1;
+                return 1;
             } 
         }
     }
@@ -592,17 +596,19 @@ int filterRecord(InexDataPtr inex, char **token)
 
     if (inex == NULL || token == NULL) {
         logError(ERROR_FUNC_ARG);
-        return -1;
+        return -2;
     }
 
     /* First token should be 'filter' */
-    if (token[0] == NULL || strcmp(token[0], "filter") != 0) 
+    if (token[0] == NULL || strcmp(token[0], "filter") != 0) {
+        logError(ERROR_WENT_WRONG);
         return -1;
+    }
 
     /* loop through filter lookup */
     while (filter_lookup[index].fieldName != NULL) {
         if (token[1] == NULL) 
-            return 1;
+            return -1;
 
         /* 
          * if the 2nd token matches with the filter lookup fieldName 
@@ -638,7 +644,7 @@ static int readInexDataFromFile(InexDataPtr inex, FILE *fp)
 
     if (inex == NULL || fp == NULL) {
         logError(ERROR_FUNC_ARG);
-        return -1;
+        return -2;
     }
 
     if (fread(&inex->meta, sizeof(inex->meta), 1, fp) != 1) {
@@ -718,10 +724,8 @@ static int isValidFileName(const char *fileName)
     int index; 
     char ch;
 
-    if (fileName == NULL) {
-        logError(ERROR_FUNC_ARG);
+    if (fileName == NULL) 
         return 0;
-    }
 
     for (index = 0; index < FILE_NAME_LEN; index++) {
         ch = fileName[index];
@@ -763,10 +767,8 @@ static int fileExist(const char *fileName)
 {
     FILE *fp;
 
-    if (fileName == NULL) {
-        logError(ERROR_FUNC_ARG);
+    if (fileName == NULL) 
         return 0;
-    }
 
     fp = fopen(fileName, "rb");
 
@@ -788,7 +790,7 @@ static int fileExist(const char *fileName)
 static int metaUpdate(InexDataPtr inex, ListNodePtr node, Record *rec)
 {
     if (inex == NULL || node == NULL) 
-        return -1;
+        return -2;
 
     /* 
      * Subtract the existing amount (for both delete and edit)
@@ -846,7 +848,7 @@ static int insertListNode(InexDataPtr inex, ListNodePtr node)
     ListNodePtr current;
 
     if (inex == NULL || node == NULL)
-        return -1;
+        return -2;
 
     current     = inex->headNode;
     node->next  = NULL;
@@ -893,10 +895,10 @@ static int insertListNode(InexDataPtr inex, ListNodePtr node)
  */
 static int updateListNode(ListNodePtr node, Record *rec)
 {
-    int no_of_field_update = 0;
+    int no_of_field_updated = 0;
 
     if (node == NULL || rec == NULL)
-        return -1;
+        return -2;
 
     /* 
      * update each field seperately 
@@ -905,27 +907,27 @@ static int updateListNode(ListNodePtr node, Record *rec)
 
     if (isValidAmount(&rec->r_amount)) {
         node->rec.r_amount = rec->r_amount;
-        no_of_field_update++;
+        no_of_field_updated++;
     }
 
     if (isValidDate(&rec->r_date)) {
         node->rec.r_date = rec->r_date;
-        no_of_field_update++;
+        no_of_field_updated++;
     }
 
     /* update only when the incoming string is valid and non-empty */
     if (isValidRecordEntity(rec) && strcmp(rec->r_entity, "") != 0) {
         strncpy(node->rec.r_entity, rec->r_entity, ENTITY_LEN);
-        no_of_field_update++;
+        no_of_field_updated++;
     }
 
     /* update only when the incoming string is valid and non-empty */
     if (isValidRecordComment(rec) && strcmp(rec->r_comment, "") != 0) {
         strncpy(node->rec.r_comment, rec->r_comment, COMMENT_LEN);
-        no_of_field_update++;
+        no_of_field_updated++;
     }
 
-    return no_of_field_update;
+    return no_of_field_updated;
 } 
 
 
@@ -945,7 +947,7 @@ static int filterByDate(InexDataPtr inex, char **token)
 
     if (inex == NULL || token == NULL) {
         logError(ERROR_FUNC_ARG);
-        return -1;
+        return -2;
     }
 
     if (token[2] == NULL || token[3] == NULL) 
@@ -1026,7 +1028,7 @@ static int filterByAmount(InexDataPtr inex, char **token)
 
     if (inex == NULL || token == NULL) {
         logError(ERROR_FUNC_ARG);
-        return -1;
+        return -2;
     }
 
     if (token[2] == NULL || token[3] == NULL)

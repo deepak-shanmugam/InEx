@@ -480,6 +480,9 @@ static int isValidStringAmount(const char *str)
         return 0;
 
     for (i = 0; str[i] != '\0'; i++) {
+        if (i >= 15)
+            return 0;
+
         if (str[i] >= '0' && str[i] <= '9') 
             continue;
 
@@ -495,9 +498,6 @@ static int isValidStringAmount(const char *str)
 
         return 0;
     }
-
-    if (i > 15)
-        return 0;
 
     if (point && (i - pos) != 3)
         return 0;
