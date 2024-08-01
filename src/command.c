@@ -20,7 +20,6 @@
 
 #define CMD_LEN         256
 #define MAX_TOKEN       10 
-#define SAVE_INPUT_LEN  16
 
 /* Function pointer definition for wrapper functions */
 typedef int (*CommandFunction)(AppDataPtr appData);
@@ -29,7 +28,6 @@ typedef int (*CommandFunction)(AppDataPtr appData);
 typedef struct {
     const char      *command;
     CommandFunction cmdFunction;
-    int             min_token;
 } CommandLookup;
 
 /* completion of definition for incomplete dataType AppDataPtr */
@@ -68,32 +66,34 @@ static int setToken(AppDataPtr appData);
 static int isSpace(char ch);
 static int printCommandPrompt(AppDataPtr appData);
 static int saveConfirmation(void);
-// static void showToken(AppDataPtr appData);
+static int validTokenCount(AppDataPtr appData, int min, int max);
+static int no_of_token(AppDataPtr appData);
+//static void showToken(AppDataPtr appData);
 
 
 /* Declaring static Lookup table */
 static const CommandLookup cmd_lookup[] = {
-    {"quit"     , quit_wrapper      , 1},
-    {"help"     , help_wrapper      , 1},
-    {"about"    , about_wrapper     , 1},
-    {"create"   , create_wrapper    , 2},
-    {"open"     , open_wrapper      , 2},
-    {"remove"   , remove_wrapper    , 2},
-    {"list"     , list_wrapper      , 1},
-    {"add"      , add_wrapper       , 2},
-    {"edit"     , edit_wrapper      , 2},
-    {"delete"   , delete_wrapper    , 2},
-    {"view"     , view_wrapper      , 1},
-    {"filter"   , filter_wrapper    , 4},
-    {"info"     , info_wrapper      , 1},
-    {"save"     , save_wrapper      , 1},
-    {"close"    , close_wrapper     , 1},
-    {NULL       , NULL              , 0}
+    {"quit"     , quit_wrapper      },
+    {"help"     , help_wrapper      },
+    {"about"    , about_wrapper     },
+    {"create"   , create_wrapper    },
+    {"open"     , open_wrapper      },
+    {"remove"   , remove_wrapper    },
+    {"list"     , list_wrapper      },
+    {"add"      , add_wrapper       },
+    {"edit"     , edit_wrapper      },
+    {"delete"   , delete_wrapper    },
+    {"view"     , view_wrapper      },
+    {"filter"   , filter_wrapper    },
+    {"info"     , info_wrapper      },
+    {"save"     , save_wrapper      },
+    {"close"    , close_wrapper     },
+    {NULL       , NULL              }
 };
 
 
 /*
- * Function to Create and initialize AppData
+ * To create and handle for appData
  */
 AppDataPtr createAppData(void) 
 {
@@ -129,59 +129,40 @@ AppDataPtr createAppData(void)
  */
 int performGetCommand(AppDataPtr appData) 
 {
-    int index;
+    int index = 0;
     int returnCode;
     
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
-    returnCode = getCommand(appData);
-    if (returnCode < 0) 
+    if ((returnCode = getCommand(appData)) != 0)
         return returnCode;
 
-    returnCode = setToken(appData);
-    /* If error occurred */
-    if (returnCode < 0) 
-        return returnCode;
-    /* if the number of eligible tokens are zero */
-    if (returnCode == 0)    
-        return 1;
-
-    // showToken(appData);  // debug
-
-    index = 0;
+    if (appData->token[0] == NULL) {
+        logError(ERROR_WENT_WRONG);
+        return -2;
+    } 
+    
     while (cmd_lookup[index].command != NULL) {
         if (strcmp(cmd_lookup[index].command, appData->token[0]) == 0) {
-            /* Minimum no of token for the command should be checked */
-            if (returnCode < cmd_lookup[index].min_token) {
-                puts("\tMESSAGE: missing arguments!");
-                return index;
-            }
-
-            /* execute the function corresponding to the command */
-            if ((returnCode = cmd_lookup[index].cmdFunction(appData)) < 0)
+            if (cmd_lookup[index].cmdFunction(appData) != 0) {
                 return -1;
-            
-            /* do not quit, if 'cancel' is selected in save confirmation */
-            if (index == 0 && returnCode == 3)
-                return 1;
-
+            }
             return index;
         }
-
         index++;
     }
 
     generic_wrapper(appData);
 
     return index;
-}
+} 
 
 
 /*
- * Function to destroy and free AppData
+ * to destroy and free AppData 
  */
 void destroyAppData(AppDataPtr appData) 
 {
@@ -208,36 +189,10 @@ void destroyAppData(AppDataPtr appData)
 
 
 /*
- * Function to Create a backup for unsaved work due to error
- */
-void createTemporaryBackup(AppDataPtr appData) 
-{
-    if (appData == NULL) {
-        logError(ERROR_ARGUMENT);
-        return;
-    }
-
-    if (appData->inex != NULL && appData->saved == 0) {
-        puts("\tTemporary backup: <under development>!");
-    }
-}
-
-
-/*
  * A Generic warpper function to handle the invalid command operation 
  */
 static int generic_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
-    if (appData->token[0] == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     puts("\tMESSAGE: unsupported command!");
 
     return 0;
@@ -246,13 +201,9 @@ static int generic_wrapper(AppDataPtr appData)
 
 static int quit_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-        
-    if (appData->inex != NULL)
+    if (appData->inex != NULL) {
         return close_wrapper(appData);
+    }
 
     return 0;
 }
@@ -260,10 +211,8 @@ static int quit_wrapper(AppDataPtr appData)
 
 static int help_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
+    if (validTokenCount(appData, 1, 2) == 0)
+        return 1;
 
     help(appData->token);
 
@@ -273,11 +222,6 @@ static int help_wrapper(AppDataPtr appData)
 
 static int about_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     about();
 
     return 0;
@@ -286,36 +230,41 @@ static int about_wrapper(AppDataPtr appData)
 
 static int create_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->token == NULL || appData->token[1] == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-    
     if (appData->inex != NULL) {
         puts("\tMESSAGE: CLOSE the file first!");
-        return 1;
+        return 2;
     }
 
-    appData->inex   = createInexData(appData->token[1]);
-    appData->saved  = 0;
+    if (validTokenCount(appData, 2, 2) == 0)
+        return 3;
 
-    return 0;
+    appData->inex   = createInexData(appData->token[1]);
+
+    if (appData->inex != NULL) {
+        appData->saved  = 0;
+        return 0;
+    }
+    
+    return 1;
 }
 
 
 static int open_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->token == NULL || appData->token[1] == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex != NULL) {
         puts("\tMESSAGE: CLOSE the file first!");
+        return 2;
+    }
+
+    if (validTokenCount(appData, 2, 2) == 0)
+        return 3;
+
+    appData->inex   = openInexDataFromFile(appData->token[1]);
+
+    if (appData->inex == NULL) {
         return 1;
     }
 
-    appData->inex   = openInexDataFromFile(appData->token[1]);
     appData->saved  = 1;
 
     return 0;
@@ -324,17 +273,17 @@ static int open_wrapper(AppDataPtr appData)
 
 static int remove_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->token == NULL || appData->token[1] == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex != NULL) {
         puts("\tMESSAGE: CLOSE the file first!");
-        return 1;
+        return 2;
     }
 
-    removeInexFile(appData->token[1]);
+    if (validTokenCount(appData, 2, 2) == 0)
+        return 3;
+
+    if (removeInexFile(appData->token[1]) != 0) {
+        return 1;
+    }
 
     return 0;
 }
@@ -342,11 +291,6 @@ static int remove_wrapper(AppDataPtr appData)
 
 static int list_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     listInexFile();
 
     return 0;
@@ -358,21 +302,16 @@ static int add_wrapper(AppDataPtr appData)
     Record rec;
     int returnCode  = 0;
 
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex == NULL) {
         puts("\tMESSAGE: No File opened!");
-        return 1;
+        return 2;
     }
 
     rec.r_id    = 0;
     rec.r_info  = -1;
 
-    if (appData->token[1] == NULL)
-        return 1;
+    if (validTokenCount(appData, 2, 2) == 0)
+        return 3;
 
     if (strcmp(appData->token[1], "in") == 0)
         rec.r_info = 1;
@@ -382,18 +321,18 @@ static int add_wrapper(AppDataPtr appData)
 
     if (rec.r_info < 0) {
         puts("\tMESSAGE: Enter valid arguments!");
-        return 1;
+        return 4;
     }
 
-    /* get record from user, 1 (non-zero) indicates mandatory field check */
+    /* mandatory field check = 1 (non-zero) indicates YES */
     returnCode = getRecordFromConsole(&rec, 1); 
     if (returnCode < 0) {
-        logError(ERROR_INPUT);
+        logError(ERROR_STD_INPUT);
         return -1;
     }
     if (returnCode > 0) {
         puts("\tMESSAGE: Enter valid values in Mandatory field!");
-        return returnCode;
+        return 5;
     }
 
     returnCode = addRecord(appData->inex, &rec);
@@ -404,7 +343,7 @@ static int add_wrapper(AppDataPtr appData)
 
     appData->saved = 0;
 
-    return returnCode;
+    return 0;
 }
 
 
@@ -413,29 +352,24 @@ static int edit_wrapper(AppDataPtr appData)
     Record rec;
     int returnCode  = 0;
 
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex == NULL) {
         puts("\tMESSAGE: No File opened!");
-        return 1;
+        return 2;
     }
 
-    if (appData->token[1] == NULL)
-        return 1;
+    if (validTokenCount(appData, 2, 2) == 0)
+        return 3;
 
-    returnCode = sscanf(appData->token[1],"%d",&rec.r_id);
+    returnCode = sscanf(appData->token[1], "%d", &rec.r_id);
     if (returnCode <= 0 || rec.r_id < 0) {
         puts("\tMESSAGE: Enter valid arguments!");
-        return 1;
+        return 4;
     }
 
-    /* get record from user, 0 passed to ignore mandatory field check */
+    /* mandatory field check = 0 (zero) indicates NO */
     returnCode = getRecordFromConsole(&rec, 0);   
     if (returnCode < 0) {
-        logError(ERROR_INPUT);
+        logError(ERROR_STD_INPUT);
         return -1;
     }
     
@@ -447,7 +381,7 @@ static int edit_wrapper(AppDataPtr appData)
 
     appData->saved = 0;
 
-    return returnCode;
+    return 0;
 }
 
 
@@ -455,23 +389,18 @@ static int delete_wrapper(AppDataPtr appData)
 {
     int id, returnCode;
 
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex == NULL) {
         puts("\tMESSAGE: No File opened!");
-        return 1;
+        return 2;
     }
 
-    if (appData->token[1] == NULL)
-        return 1;
+    if (validTokenCount(appData, 2, 2) == 0)
+        return 3;
 
-    returnCode = sscanf(appData->token[1],"%d",&id);
+    returnCode = sscanf(appData->token[1], "%d", &id);
     if (returnCode <= 0 || id < 0) {
         puts("\tMESSAGE: Enter valid arguments!");
-        return 1;
+        return 4;
     }
 
     returnCode = deleteRecord(appData->inex, id);
@@ -482,7 +411,7 @@ static int delete_wrapper(AppDataPtr appData)
 
     appData->saved = 0;
 
-    return returnCode;
+    return 0;
 }
 
 
@@ -490,21 +419,19 @@ static int view_wrapper(AppDataPtr appData)
 {
     int returnCode;
 
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex == NULL) {
         puts("\tMESSAGE: No File opened!");
-        return 1;
+        return 2;
     }
+
+    if (validTokenCount(appData, 1, 2) == 0)
+        return 3;
 
     returnCode = viewRecord(appData->inex, appData->token[1]);
     if (returnCode != 0)
         return 1;
 
-    return returnCode;
+    return 0;
 }
 
 
@@ -512,15 +439,13 @@ static int filter_wrapper(AppDataPtr appData)
 {
     int returnCode;
 
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex == NULL) {
         puts("\tMESSAGE: No File opened!");
-        return 1;
+        return 2;
     }
+
+    if (validTokenCount(appData, 4, 5) == 0)
+        return 3;
 
     returnCode = filterRecord(appData->inex, appData->token);
     if (returnCode != 0) {
@@ -528,7 +453,7 @@ static int filter_wrapper(AppDataPtr appData)
         return 1;
     }
 
-    return returnCode;
+    return 0;
 }
 
 
@@ -536,14 +461,9 @@ static int info_wrapper(AppDataPtr appData)
 {
     int returnCode;
 
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex == NULL) {
         puts("\tMESSAGE: No File opened!");
-        return 1;
+        return 2;
     }
 
     puts("");
@@ -561,29 +481,27 @@ static int info_wrapper(AppDataPtr appData)
 
     puts("");
 
-    return returnCode;
+    return 0;
 } 
 
 
 static int save_wrapper(AppDataPtr appData) 
 {
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
-
     if (appData->inex == NULL) {
         puts("\tMESSAGE: No File opened!");
-        return 0; 
+        return 2; 
     }
         
     if (appData->saved) {
         puts("\tMESSAGE: Already saved!");
-        return 0;
+        return 3;
     }
 
-    if (saveInexData(appData->inex) == 0) 
-        appData->saved  = 1;
+    if (saveInexData(appData->inex) != 0) {
+        return 1;
+    }
+
+    appData->saved  = 1;
 
     return 0;
 }
@@ -591,37 +509,36 @@ static int save_wrapper(AppDataPtr appData)
 
 static int close_wrapper(AppDataPtr appData) 
 {
-    int confirmation = 0;
-
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
+    int returnCode;
 
     if (appData->inex == NULL) {
         puts("\tMESSAGE: No File opened!");
         return 0;
     }
         
+    /* if file not saved, ask confirmation to save */
     if (appData->saved == 0) {
-        while((confirmation = saveConfirmation()) == 0);
+        while((returnCode = saveConfirmation()) == 0);
 
-        if (confirmation < 0) {
-            logError(ERROR_INPUT);
+        if (returnCode < 0) {
+            logError(ERROR_STD_INPUT);
             return -1;
         }
 
-        if (confirmation == 1) 
+        /* indicates 'cancel', do not save or close */
+        if (returnCode == 3)
+            return 1;
+
+        /* indicates 'yes', try to save before close */
+        if (returnCode == 1) 
             save_wrapper(appData);
     }
 
-    if (confirmation != 3) {
-        destroyInexData(appData->inex);
-        appData->inex = NULL;
-        appData->saved = 0;
-    }
+    destroyInexData(appData->inex);
+    appData->inex = NULL;
+    appData->saved = 0;
 
-    return confirmation;
+    return 0;
 } 
 
 
@@ -631,19 +548,22 @@ static int close_wrapper(AppDataPtr appData)
 static int getCommand(AppDataPtr appData) 
 {
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
+        logError(ERROR_FUNC_ARG);
+        return -2;
     }
         
     memset(appData->cmd, 0, CMD_LEN * sizeof(*(appData->cmd)));
 
     if (printCommandPrompt(appData) != 0)
-        return -1;
+        return -3;
     
     if (getStringFromConsole(appData->cmd, CMD_LEN) < 0) {
-        logError(ERROR_INPUT);
+        logError(ERROR_STD_INPUT);
         return -1;
     }
+
+    if (setToken(appData) <= 0) 
+        return 1;
 
     return 0;
 }
@@ -659,11 +579,6 @@ static int setToken(AppDataPtr appData)
     int insideQuote     = 0;
     int enable_token    = 1;
     char ch;
-
-    if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
 
     memset(appData->token, 0, MAX_TOKEN * sizeof(*(appData->token)));
 
@@ -736,7 +651,7 @@ static int printCommandPrompt(AppDataPtr appData)
     static const char *cmd_line = ">> ";
 
     if (appData == NULL || appData->cmd == NULL || appData->token == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
@@ -751,6 +666,7 @@ static int printCommandPrompt(AppDataPtr appData)
     }
 
     printf("%s", cmd_line);
+    fflush(stdout);
 
     return 0;
 }
@@ -761,29 +677,69 @@ static int printCommandPrompt(AppDataPtr appData)
  */
 static int saveConfirmation(void) 
 {
-    char ch;
-    static char buffer[SAVE_INPUT_LEN]; 
+    static char buffer[2]; 
     static const char *message = "\tDo you want to save? [y/n/c] ";
 
-    memset(buffer, 0, SAVE_INPUT_LEN);
+    memset(buffer, 0, 2);
 
     printf("%s", message);
     
-    if (getStringFromConsole(buffer, SAVE_INPUT_LEN) < 0)
+    if (getStringFromConsole(buffer, 2) < 0)
         return -1;
 
-    ch = buffer[0];
-
-    if (ch == 'y' || ch == 'Y')
+    if (buffer[0] == 'y' || buffer[0] == 'Y')
         return 1;
 
-    if (ch == 'n' || ch == 'N')
+    if (buffer[0] == 'n' || buffer[0] == 'N')
         return 2;
 
-    if (ch == 'c' || ch == 'C')
+    if (buffer[0] == 'c' || buffer[0] == 'C')
         return 3;
 
     return 0;
+}
+
+
+/*
+ * To validate total no of tokens entered 
+ */
+static int validTokenCount(AppDataPtr appData, int min, int max) 
+{
+    int count;
+
+    if (appData == NULL || appData->cmd == NULL || appData->token == NULL)
+        return 0;
+
+    count = no_of_token(appData);
+
+    if (count < min) {
+        puts("\tMESSAGE: Missing Command Arguments!");
+        return 0;
+    }
+
+    if (count > max) {
+        puts("\tMESSAGE: Too many Command Arguments!");
+        return 0;
+    }
+
+    return 1;
+}
+
+
+/*
+ * To return the no of tokens present 
+ */
+static int no_of_token(AppDataPtr appData) 
+{
+    int index = 0;
+
+    if (appData == NULL || appData->cmd == NULL || appData->token == NULL)
+        return -1;
+
+    while (appData->token[index] != NULL && index < MAX_TOKEN) 
+        index++;
+
+    return index;
 }
 
 
@@ -793,9 +749,10 @@ static void showToken(AppDataPtr appData)
 {
     int index = 0;
 
+    puts("");
     while(appData->token[index] != NULL) {
         printf("%d - %s\n", index, appData->token[index]);
         index++;
     }
-}
+} 
 */ 

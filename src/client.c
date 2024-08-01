@@ -20,13 +20,6 @@ int main(int argc, char *argv[])
 
     while (returnCode) {
         returnCode = performGetCommand(appData);
-        //printf("Return code: %d\n",returnCode);
-
-        if (returnCode < 0) {
-            createTemporaryBackup(appData);
-
-            break;
-        }
     }
     
     destroyAppData(appData);

@@ -88,7 +88,7 @@ InexDataPtr createInexData(const char *fileName)
     char fileNameExtension[FILE_NAME_LEN];
 
     if (fileName == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return NULL;
     }
         
@@ -138,7 +138,7 @@ InexDataPtr openInexDataFromFile(const char *fileName)
     char completeFileName[FILE_NAME_LEN];
 
     if (fileName == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return NULL;
     }
 
@@ -187,7 +187,7 @@ end_open:
 int infoInexData(InexDataPtr inex) 
 {
     if (inex == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
@@ -210,7 +210,7 @@ int saveInexData(InexDataPtr inex)
     int returnCode;
 
     if (inex == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -2;
     }
 
@@ -279,14 +279,12 @@ int removeInexFile(const char *fileName)
 {
     char fileNameExtension[FILE_NAME_LEN];
 
-    if (fileName == NULL) {
-        logError(ERROR_ARGUMENT);
-        return -1;
-    }
+    if (fileName == NULL) 
+        return 2;
         
     if (isValidFileName(fileName) == 0) {
         puts("\tMESSAGE: Invalid FileName!");
-        return -1;
+        return 3;
     }
 
     strncpy(fileNameExtension, fileName, FILE_NAME_LEN);
@@ -294,7 +292,7 @@ int removeInexFile(const char *fileName)
 
     if (fileExist(fileNameExtension) == 0) {
         puts("\tMESSAGE: File doesn't exist!");
-        return -1;
+        return 4;
     }
 
     /*
@@ -303,7 +301,7 @@ int removeInexFile(const char *fileName)
 
     if (remove(fileNameExtension) != 0) {
         logError(ERROR_FILE_REMOVE);
-        return -1;
+        return 1;
     }
 
     return 0;
@@ -337,7 +335,7 @@ int addRecord(InexDataPtr inex, Record *rec)
     long remaining_expense  = 0;
 
     if (inex == NULL || rec == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -2;
     }
 
@@ -393,7 +391,7 @@ int editRecord(InexDataPtr inex, Record *rec)
     int no_of_field_update = 0;
 
     if (inex == NULL || rec == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
@@ -469,7 +467,7 @@ int deleteRecord(InexDataPtr inex, int record_id)
     ListNodePtr temp;
 
     if (inex == NULL || record_id < 0) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
@@ -533,7 +531,7 @@ int viewRecord(InexDataPtr inex, const char *argument)
     long expense    = 0;
 
     if (inex == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
@@ -593,7 +591,7 @@ int filterRecord(InexDataPtr inex, char **token)
     int index = 0;
 
     if (inex == NULL || token == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
@@ -639,7 +637,7 @@ static int readInexDataFromFile(InexDataPtr inex, FILE *fp)
     ListNodePtr temp_node;
 
     if (inex == NULL || fp == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
@@ -685,7 +683,7 @@ static int writeInexDataIntoFile(InexDataPtr inex, FILE *fp)
     ListNodePtr current_node;
 
     if (inex == NULL || fp == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -2;
     }
 
@@ -721,7 +719,7 @@ static int isValidFileName(const char *fileName)
     char ch;
 
     if (fileName == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return 0;
     }
 
@@ -766,7 +764,7 @@ static int fileExist(const char *fileName)
     FILE *fp;
 
     if (fileName == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return 0;
     }
 
@@ -946,7 +944,7 @@ static int filterByDate(InexDataPtr inex, char **token)
     long expense    = 0;
 
     if (inex == NULL || token == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 
@@ -1027,7 +1025,7 @@ static int filterByAmount(InexDataPtr inex, char **token)
     long expense    = 0;
 
     if (inex == NULL || token == NULL) {
-        logError(ERROR_ARGUMENT);
+        logError(ERROR_FUNC_ARG);
         return -1;
     }
 

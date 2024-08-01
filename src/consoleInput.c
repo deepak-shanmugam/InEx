@@ -31,6 +31,10 @@ int getStringFromConsole(char *input, int length)
     if (input == NULL || length <= 0)
         return -2;
 
+    /* Before getting input, check if any feof error in terminal */
+    if (feof(stdin) != 0) 
+        clearerr(stdin);
+
     if (fgets(input, length, stdin) == NULL)
         return -1;
 

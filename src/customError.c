@@ -15,29 +15,32 @@ void logError(ErrorCode err)
     fprintf(stderr, "\n\t");
 
     switch (err) {
-        case ERROR_ARGUMENT:
-            fprintf(stderr, "ERROR: function argument error occurred");
+        case ERROR_FUNC_ARG:
+            fprintf(stderr, "ERROR: function argument error");
             break;
-        case ERROR_INPUT:
-            fprintf(stderr, "ERROR: input error occurred");
+        case ERROR_STD_INPUT:
+            fprintf(stderr, "ERROR: standard input error");
             break;
         case ERROR_MEMORY_ALLOC:
-            fprintf(stderr, "ERROR: memory allocation failed");
+            fprintf(stderr, "ERROR: memory allocation error");
             break;
         case ERROR_FILE_OPEN:
-            fprintf(stderr, "ERROR: failed to open file");
+            fprintf(stderr, "ERROR: error opening file");
             break;
         case ERROR_FILE_READ:
-            fprintf(stderr, "ERROR: error occurred during file read");
+            fprintf(stderr, "ERROR: file read error");
             break;
         case ERROR_FILE_WRITE:
-            fprintf(stderr, "ERROR: error occurred during file write");
+            fprintf(stderr, "ERROR: file write error");
             break;
         case ERROR_FILE_REMOVE:
-            fprintf(stderr, "ERROR: Unable to remove file");
+            fprintf(stderr, "ERROR: error removing file");
+            break;
+        case ERROR_WENT_WRONG:
+            fprintf(stderr, "ERROR: something went wrong");
             break;
         default:
-            fprintf(stderr, "ERROR: error not defined");
+            fprintf(stderr, "ERROR: undefined error");
             break;
     }
 
