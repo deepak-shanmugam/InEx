@@ -1,10 +1,16 @@
-# InEx
-> BETA Version:
+# VERSION Discontinued
+A new version of this application is UNDER DEVELOPMENT with a much better implementation. Further updates will be provided. Stay tuned!
 
-BETA version of CLI based Income and Expense tracking application created using C language.
+# ISSUES
+Some OS oriented or device oriented issues were identified. A new version of this application will soon arrive with much better implementation! 
+
+# InEx
+> BETA Version: (discontinued)
+
+Discontinued BETA version of CLI based Income and Expense tracking application created using C language. No more further updates in this version.
 
 # Supported Operating System
-> Linux, Windows, Mac
+> Linux, ~~Windows, Mac~~
 
 # Build
 > using make:
@@ -35,7 +41,9 @@ use 'help' command to know more about each command and its arguments. Alternativ
 
 The objective of this project is to develope a compact and simple command based Income and Expense tracking application in C language. I have been trying to develope this with a much better implementation practises (stability, security, scalability and readability) as of my current skill. Because I was not satisfied with my previous 2 similar discontinued projects (InEx-plus and InEx-app) due to lack of better implementations and poor implementation respectively, even though it just works. However, there is a significant improvement in the implementation of this project in all aspects compared to the previous ones. 
 
-Feedbacks and suggestions are welcome. you can also report bugs in your convenient way.
+Note: Some os oriented or device oriented issues were identified. A new version of this application will soon arrive with much better implementation! 
+
+~~Feedbacks and suggestions are welcome. you can also report bugs in your convenient way.~~
 
 > Email: deepdeepdeepak@outlook.com
 
